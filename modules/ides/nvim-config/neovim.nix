@@ -177,12 +177,18 @@
       tsgo # TypeScript 7 native compiler
       oxlint
       tailwindcss-language-server
+      gopls
 
       # Formatters
       prettierd
       nodePackages.prettier
       stylua
       nixfmt-rfc-style
+      go
+      gofumpt
+      gotools
+      golangci-lint
+      delve
 
       # Snacks picker dependencies (also used by Telescope if re-enabled)
       ripgrep

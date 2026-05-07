@@ -1,7 +1,24 @@
 -- LSP Configuration
 
+local ts_root_markers = { "tsconfig.json", "jsconfig.json", "package.json", ".git" }
+
+local function get_ts_root(bufnr)
+	local filename = vim.api.nvim_buf_get_name(bufnr)
+	return vim.fs.root(filename, ts_root_markers)
+end
+
+local function has_local_tsgo(root)
+	return root and vim.uv.fs_stat(root .. "/node_modules/.bin/tsgo") ~= nil
+end
+
 -- Configure tsgo with more memory
 vim.lsp.config("tsgo", {
+	root_dir = function(bufnr, on_dir)
+		local root = get_ts_root(bufnr)
+		if has_local_tsgo(root) then
+			on_dir(root)
+		end
+	end,
 	init_options = {
 		maxTsServerMemory = 16384,
 	},
@@ -22,14 +39,49 @@ vim.lsp.config("tsgo", {
 	},
 })
 
+vim.lsp.config("ts_ls", {
+	root_dir = function(bufnr, on_dir)
+		local root = get_ts_root(bufnr)
+		if root and not has_local_tsgo(root) then
+			on_dir(root)
+		end
+	end,
+})
+
 vim.lsp.config("oxlint", {
 	cmd = { "oxlint", "--lsp" },
+})
+
+vim.lsp.config("gopls", {
+	settings = {
+		gopls = {
+			gofumpt = true,
+			staticcheck = true,
+			analyses = {
+				fieldalignment = true,
+				nilness = true,
+				shadow = true,
+				unusedparams = true,
+				unusedwrite = true,
+			},
+			hints = {
+				assignVariableTypes = true,
+				compositeLiteralFields = true,
+				constantValues = true,
+				functionTypeParameters = true,
+				parameterNames = true,
+				rangeVariableTypes = true,
+			},
+		},
+	},
 })
 
 -- Enable servers (configs come from nvim-lspconfig)
 vim.lsp.enable({
 	"tsgo",
+	"ts_ls",
 	"oxlint",
+	"gopls",
 	-- "tailwindcss",
 	-- Add more servers as needed:
 	-- "lua_ls",

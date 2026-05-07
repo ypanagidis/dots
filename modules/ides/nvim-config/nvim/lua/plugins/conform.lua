@@ -19,6 +19,10 @@ conform.setup({
 
 		lua = { "stylua" },
 		nix = { "nixfmt" },
+		go = { "goimports", "gofumpt" },
+		gomod = { "gofmt" },
+		gowork = { "gofmt" },
+		gotmpl = { "gofmt" },
 	},
 
 	formatters = {
