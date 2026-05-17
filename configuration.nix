@@ -21,6 +21,7 @@
     ./modules/steam.nix
     ./modules/crapple-display.nix
     ./modules/kdeconnect.nix
+    ./modules/logitech.nix
     ./modules/sunshine.nix
   ];
 
@@ -120,6 +121,8 @@
 
   environment.sessionVariables = {
     _JAVA_AWT_WM_NONREPARENTING = "1";
+    MOZ_ENABLE_WAYLAND = "1";
+    NIXOS_OZONE_WL = "1";
   };
 
   powerManagement.powerDownCommands = ''
