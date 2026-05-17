@@ -13,9 +13,6 @@ in
 {
   config = lib.mkMerge [
     {
-      # Steam is unfree (you already set this globally, so this is optional)
-      nixpkgs.config.allowUnfree = true;
-
       programs.steam = {
         enable = true;
         remotePlay.openFirewall = true;

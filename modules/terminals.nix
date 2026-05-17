@@ -1,58 +1,46 @@
-{ pkgs, lib, ... }:
+{ ... }:
 
-lib.mkMerge [
-  # Cyberdream theme for Ghostty
-  {
-    xdg.configFile."ghostty/themes/cyberdream".text = ''
-      # cyberdream theme for ghostty
-      palette = 0=#16181a
-      palette = 1=#ff6e5e
-      palette = 2=#5eff6c
-      palette = 3=#f1ff5e
-      palette = 4=#5ea1ff
-      palette = 5=#bd5eff
-      palette = 6=#5ef1ff
-      palette = 7=#ffffff
-      palette = 8=#3c4048
-      palette = 9=#ff6e5e
-      palette = 10=#5eff6c
-      palette = 11=#f1ff5e
-      palette = 12=#5ea1ff
-      palette = 13=#bd5eff
-      palette = 14=#5ef1ff
-      palette = 15=#ffffff
+{
+  # Linux-only main branch: the old Darwin Ghostty branch lives on the
+  # `multihost-config` branch now.
+  xdg.configFile."ghostty/themes/cyberdream".text = ''
+    # cyberdream theme for ghostty
+    palette = 0=#16181a
+    palette = 1=#ff6e5e
+    palette = 2=#5eff6c
+    palette = 3=#f1ff5e
+    palette = 4=#5ea1ff
+    palette = 5=#bd5eff
+    palette = 6=#5ef1ff
+    palette = 7=#ffffff
+    palette = 8=#3c4048
+    palette = 9=#ff6e5e
+    palette = 10=#5eff6c
+    palette = 11=#f1ff5e
+    palette = 12=#5ea1ff
+    palette = 13=#bd5eff
+    palette = 14=#5ef1ff
+    palette = 15=#ffffff
 
-      background = #16181a
-      foreground = #ffffff
-      cursor-color = #ffffff
-      selection-background = #3c4048
-      selection-foreground = #ffffff
-    '';
-  }
+    background = #16181a
+    foreground = #ffffff
+    cursor-color = #ffffff
+    selection-background = #3c4048
+    selection-foreground = #ffffff
+  '';
 
-  (lib.mkIf pkgs.stdenv.isLinux {
-    programs.ghostty = {
-      enable = true;
-      settings = {
-        font-size = 15;
-        theme = "cyberdream";
-        window-decoration = false;
-        gtk-titlebar = false;
-        copy-on-select = "clipboard";
-        keybind = [
-          "ctrl+,=unbind"
-          "ctrl+alt+o=open_config"
-        ];
-      };
+  programs.ghostty = {
+    enable = true;
+    settings = {
+      font-size = 15;
+      theme = "cyberdream";
+      window-decoration = false;
+      gtk-titlebar = false;
+      copy-on-select = "clipboard";
+      keybind = [
+        "ctrl+,=unbind"
+        "ctrl+alt+o=open_config"
+      ];
     };
-  })
-
-  (lib.mkIf pkgs.stdenv.isDarwin {
-    xdg.configFile."ghostty/config".text = ''
-      font-size = 16
-      theme = cyberdream
-      window-decoration = false
-      copy-on-select = clipboard
-    '';
-  })
-]
+  };
+}

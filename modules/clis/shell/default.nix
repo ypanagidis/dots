@@ -2,8 +2,6 @@
 
 let
   linuxRebuild = "sudo nixos-rebuild switch --flake path:$HOME/nixcfg#nixos";
-  darwinRebuild = "sudo -H darwin-rebuild switch --flake path:$HOME/nixcfg#yiannis-mbp";
-  rebuildCommand = if pkgs.stdenv.isDarwin then darwinRebuild else linuxRebuild;
 
   linuxUpdateHelpers = lib.optionalString pkgs.stdenv.isLinux ''
     uc() {
@@ -142,7 +140,7 @@ in
       # 5. ALIASES (RESTORED)
       # ---------------------------------------------------------
       function re() {
-        pushd ~/nixcfg > /dev/null && ${rebuildCommand} && popd > /dev/null
+        pushd ~/nixcfg > /dev/null && ${linuxRebuild} && popd > /dev/null
       }
 
       function ocu() {

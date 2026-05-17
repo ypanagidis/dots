@@ -1,3 +1,25 @@
+{ pkgs, ... }:
+
+let
+  # Plasma occasionally forgets the panel hiding mode after sleep/resume. This
+  # script is safe to run repeatedly: it only touches bottom panels and leaves
+  # every other panel alone.
+  enforceBottomPanelAutohide = pkgs.writeShellScript "kde-bottom-panel-autohide" ''
+    set -euo pipefail
+
+    plasma_script='for (const panel of panels()) { if (panel.location === "bottom" || panel.location === 4) { panel.hiding = "autohide"; } }'
+
+    # Use busctl instead of qdbus so this does not depend on an extra Qt tools
+    # binary being installed. If plasmashell is not ready yet, fail softly; the
+    # timer below will retry shortly.
+    ${pkgs.systemd}/bin/busctl --user --timeout=5 call \
+      org.kde.plasmashell \
+      /PlasmaShell \
+      org.kde.PlasmaShell \
+      evaluateScript \
+      s "$plasma_script" >/dev/null 2>&1 || true
+  '';
+in
 {
   programs.plasma = {
     enable = true;
@@ -11,6 +33,8 @@
       runAlways = true;
       priority = 4;
       text = ''
+        // Initial login-time enforcement. A user timer below keeps this sticky
+        // after sleep/resume because Plasma sometimes resets panel hiding.
         for (const panel of panels()) {
           if (panel.location === "bottom" || panel.location === 4) {
             panel.hiding = "autohide";
@@ -271,6 +295,11 @@
       kdeglobals.WM.inactiveBlend = "161,169,177";
       kdeglobals.WM.inactiveForeground = "161,169,177";
       kscreenlockerrc.Daemon.Timeout = 30;
+      # Start a clean KDE session instead of restoring whatever was open at the
+      # last logout. This prevents Remmina (and other old session windows) from
+      # popping back up on login.
+      ksmserverrc.General.loginMode = "emptySession";
+      ksmserverrc.General.excludeApps = "remmina";
       kwalletrc.Wallet."Close When Idle" = false;
       kwalletrc.Wallet."Close on Screensaver" = false;
       kwalletrc.Wallet."Default Wallet" = "kdewallet";
@@ -454,5 +483,34 @@
       "kate/anonymous.katesession"."Plugin:katesearchplugin:MainWindow:0".SizeLimit = 128;
       "kate/anonymous.katesession"."Plugin:katesearchplugin:MainWindow:0".UseRegExp = false;
     };
+  };
+
+  systemd.user.services.kde-bottom-panel-autohide = {
+    Unit = {
+      Description = "Force KDE bottom panel autohide";
+      After = [ "graphical-session.target" ];
+      PartOf = [ "graphical-session.target" ];
+    };
+
+    Service = {
+      Type = "oneshot";
+      ExecStart = enforceBottomPanelAutohide;
+    };
+
+    Install.WantedBy = [ "graphical-session.target" ];
+  };
+
+  systemd.user.timers.kde-bottom-panel-autohide = {
+    Unit.Description = "Periodically reapply KDE bottom panel autohide";
+
+    Timer = {
+      # Run shortly after login, then keep correcting Plasma if sleep/resume or
+      # a shell restart flips the panel back to always-visible.
+      OnBootSec = "30s";
+      OnUnitActiveSec = "2min";
+      Unit = "kde-bottom-panel-autohide.service";
+    };
+
+    Install.WantedBy = [ "timers.target" ];
   };
 }

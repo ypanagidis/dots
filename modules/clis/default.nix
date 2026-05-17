@@ -43,4 +43,9 @@
       };
     };
   };
+
+  # User-facing CLI tools that are not provided by a richer HM program module.
+  home.packages = with pkgs; [
+    neofetch
+  ];
 }

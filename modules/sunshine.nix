@@ -11,7 +11,9 @@
     package = pkgs.sunshine.override {
       cudaSupport = true;
     };
-    autoStart = true;
+    # Keep Sunshine installed and configured, but do not launch it automatically
+    # when the machine boots or the user session starts.
+    autoStart = false;
     capSysAdmin = true;
     openFirewall = true;
     settings = {
