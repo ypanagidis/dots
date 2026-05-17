@@ -4,7 +4,6 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
     nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixos-unstable";
-    nixpkgs-opencode.url = "github:NixOS/nixpkgs";
 
     typescript-go = {
       url = "github:microsoft/typescript-go/fdea8102676c0f3f5027b026a9bd4f289c1c471c";
@@ -18,7 +17,6 @@
 
     opencode-flake = {
       url = "github:anomalyco/opencode";
-      inputs.nixpkgs.follows = "nixpkgs-opencode";
     };
 
     claude = {
@@ -58,50 +56,11 @@
         let
           lib = prev.lib;
           system = prev.stdenv.hostPlatform.system;
-          opencodeBunVersion = "1.3.13";
-          opencodeBunSources = {
-            aarch64-darwin = {
-              url = "https://github.com/oven-sh/bun/releases/download/bun-v${opencodeBunVersion}/bun-darwin-aarch64.zip";
-              hash = "sha256-VGfj9l26Umuf6pjwzOBO+vwMY+Fpcz7Ce4dqOtMtoZA=";
-            };
-            aarch64-linux = {
-              url = "https://github.com/oven-sh/bun/releases/download/bun-v${opencodeBunVersion}/bun-linux-aarch64.zip";
-              hash = "sha256-cLrkGzkIsKEg4eWMXIrzDnSvrjuNEbDT/djnh937SyI=";
-            };
-            x86_64-darwin = {
-              url = "https://github.com/oven-sh/bun/releases/download/bun-v${opencodeBunVersion}/bun-darwin-x64-baseline.zip";
-              hash = "sha256-qYumpIDyL9qbNDYmuQak4mqlNhi/hdK8WSjs8rpF8O0=";
-            };
-            x86_64-linux = {
-              url = "https://github.com/oven-sh/bun/releases/download/bun-v${opencodeBunVersion}/bun-linux-x64.zip";
-              hash = "sha256-ecB3H6i5LDOq5B4VoODTB+qZ0OLwAxfHHGxTI3p44lo=";
-            };
-          };
-
           hasSystemPackages =
             flake: builtins.hasAttr "packages" flake && builtins.hasAttr system flake.packages;
           hasPackage =
             flake: packageName:
             hasSystemPackages flake && builtins.hasAttr packageName flake.packages.${system};
-          opencodePkgs =
-            if hasPackage opencode-flake "default" then
-              import inputs.nixpkgs-opencode {
-                inherit system;
-                overlays = [
-                  (
-                    final': prev':
-                    lib.optionalAttrs (builtins.hasAttr system opencodeBunSources) {
-                      bun = prev'.bun.overrideAttrs (_: {
-                        version = opencodeBunVersion;
-                        src = final'.fetchurl opencodeBunSources.${system};
-                      });
-                    }
-                  )
-                  opencode-flake.overlays.default
-                ];
-              }
-            else
-              null;
         in
         {
           # VSCode extensions
@@ -209,10 +168,14 @@
               doCheck = false;
             };
         }
-        // lib.optionalAttrs (hasPackage opencode-flake "default") {
-          opencode = opencodePkgs.opencode.overrideAttrs (old: {
-            patches = (old.patches or [ ]) ++ [ ./patches/opencode-generate-no-prettier.patch ];
-          });
+        // lib.optionalAttrs (hasPackage opencode-flake "opencode") {
+          # Upstream anomalyco/opencode already ships a flake package. Use it
+          # directly instead of carrying a local nixpkgs import, Bun override,
+          # and source patch in this overlay.
+          opencode = opencode-flake.packages.${system}.opencode;
+        }
+        // lib.optionalAttrs (hasPackage opencode-flake "opencode-desktop") {
+          opencode-desktop = opencode-flake.packages.${system}.opencode-desktop;
         }
         // lib.optionalAttrs (hasPackage claude "default") {
           claude = claude.packages.${system}.default;

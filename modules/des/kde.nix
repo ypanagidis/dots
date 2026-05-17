@@ -70,7 +70,7 @@ in
         "Launch (C)"
       ];
       kwin.ExposeClass = "Ctrl+F7";
-      kwin."Grid View" = "Meta+G";
+      kwin."Grid View" = [ ];
       kwin."Kill Window" = "Meta+Ctrl+Esc";
       kwin.MoveMouseToCenter = "Meta+F6";
       kwin.MoveMouseToFocus = "Meta+F5";
@@ -214,7 +214,28 @@ in
         "Meta+Shift+S"
         "Ctrl+#"
       ];
+      "services/opencode-desktop.desktop"._launch = "Meta+G";
     };
+    window-rules = [
+      {
+        description = "OpenCode Desktop without titlebar";
+        match = {
+          window-class = {
+            value = "electron";
+            type = "exact";
+            match-whole = false;
+          };
+          title = {
+            value = "OpenCode";
+            type = "exact";
+          };
+        };
+        apply.noborder = {
+          value = true;
+          apply = "force";
+        };
+      }
+    ];
     configFile = {
       baloofilerc.General.dbVersion = 2;
       baloofilerc.General."exclude filters" =
@@ -338,7 +359,7 @@ in
       plasmarc.Wallpapers.usersWallpapers = "";
       "plasma-org.kde.plasma.desktop-appletsrc"."Containments/3/Applets/30/Configuration/General".launchers =
         {
-          value = "applications:helium.desktop,applications:com.mitchellh.ghostty.desktop,applications:discord.desktop,applications:io.github.nokse22.high-tide.desktop,applications:obsidian.desktop,applications:datagrip.desktop,applications:bruno.desktop,applications:code.desktop,applications:systemsettings.desktop,preferred://filemanager";
+          value = "applications:helium.desktop,applications:com.mitchellh.ghostty.desktop,applications:discord.desktop,applications:io.github.nokse22.high-tide.desktop,applications:obsidian.desktop,applications:datagrip.desktop,applications:bruno.desktop,applications:opencode-desktop.desktop,applications:systemsettings.desktop,preferred://filemanager";
           escapeValue = false;
         };
       spectaclerc.Annotations.annotationToolType = 9;

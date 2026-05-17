@@ -147,7 +147,7 @@ in
         local original_dir="$PWD"
         cd ~/nixcfg || return 1
 
-        if nix flake update custom-packages/nixpkgs-opencode custom-packages/opencode-flake; then
+        if nix flake update custom-packages/opencode-flake; then
           echo "Rebuilding..."
           re
         else

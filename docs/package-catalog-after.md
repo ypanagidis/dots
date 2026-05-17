@@ -128,9 +128,8 @@ These are not long package lists, but they still cause NixOS to pull in services
 
 | Declaration | Location | Packages / apps / libs |
 | --- | --- | --- |
-| Imported package sets | `custom-packages/flake.nix` | `nixpkgs-unstable`, `nixpkgs-opencode`, `nix-vscode-extensions`, `opencode-flake`, `claude`, `winapps`, `nordvpn-flake` |
-| Overlay packages | `custom-packages/flake.nix` | `pscale`, `oxfmt`, `oxlint`, `tailwindcss-language-server`, `tsgo`, `opencode`, `claude`, `nordvpn`, `winapps`, `winapps-launcher` |
-| Opencode bun sources | `custom-packages/flake.nix` | `bun` replacement sources for `aarch64-darwin`, `aarch64-linux`, `x86_64-darwin`, `x86_64-linux` |
+| Imported package sets | `custom-packages/flake.nix` | `nixpkgs-unstable`, `nix-vscode-extensions`, `opencode-flake`, `claude`, `winapps`, `nordvpn-flake` |
+| Overlay packages | `custom-packages/flake.nix` | `pscale`, `oxfmt`, `oxlint`, `tailwindcss-language-server`, `tsgo`, upstream `opencode`, `claude`, `nordvpn`, `winapps`, `winapps-launcher` |
 | Build tools inside overrides | `custom-packages/flake.nix` | `rustPlatform.fetchCargoVendor`, `fetchPnpmDeps`, `pnpm_10`, `pnpm_9`, `go_1_26`, `buildGoModule` |
 
 ## Remaining Intentional Duplicates
