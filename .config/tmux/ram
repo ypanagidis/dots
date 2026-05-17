@@ -1,0 +1,21 @@
+#!/bin/sh
+
+total=$(/usr/sbin/sysctl -n hw.memsize)
+
+/usr/bin/vm_stat | /usr/bin/awk -v total="$total" '
+  /page size of/ { page_size=$8 }
+  /Pages free:/ { free=$3 }
+  /File-backed pages:/ { file_backed=$3 }
+  {
+    gsub(/\./, "", page_size)
+    gsub(/\./, "", free)
+    gsub(/\./, "", file_backed)
+  }
+  END {
+    gib = 1024 * 1024 * 1024
+    available = (free + file_backed) * page_size
+    used = total - available
+    if (used < 0) used = 0
+    printf "%.0fG/%.0fG", used / gib, total / gib
+  }
+'

@@ -1,0 +1,10 @@
+#!/bin/sh
+
+/usr/sbin/iostat -w 1 -c 2 | /usr/bin/awk '
+  /^[[:space:]]*[0-9.]+[[:space:]]/ {
+    idle=$6
+  }
+  END {
+    printf "%.0f%%", 100 - idle
+  }
+'
