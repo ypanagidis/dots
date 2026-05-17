@@ -44,8 +44,12 @@ in
     categories = [ "Development" ];
     icon = "applications-development";
     startupNotify = true;
+    # The Nix-built OpenCode wrapper runs the generic Electron binary, so KWin
+    # reports the live window class as "electron". Matching that lets KDE
+    # activate the existing single-instance window instead of spawning a
+    # transient second Electron process from the launcher shortcut.
     settings = {
-      StartupWMClass = "ai.opencode.desktop";
+      StartupWMClass = "electron";
     };
   };
 
