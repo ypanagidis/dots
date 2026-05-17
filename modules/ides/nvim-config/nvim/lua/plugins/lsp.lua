@@ -83,6 +83,9 @@ vim.lsp.enable({
 	"oxlint",
 	"gopls",
 	-- "tailwindcss",
+	"eslint",
+	"prettier",
+	"biome",
 	-- Add more servers as needed:
 	-- "lua_ls",
 	-- "pyright",
