@@ -1,6 +1,21 @@
 -- LSP Configuration
 
 local ts_root_markers = { "tsconfig.json", "jsconfig.json", "package.json", ".git" }
+local tailwind_root_markers = {
+	"tailwind.config.js",
+	"tailwind.config.cjs",
+	"tailwind.config.mjs",
+	"tailwind.config.ts",
+	"postcss.config.js",
+	"postcss.config.cjs",
+	"postcss.config.mjs",
+	"postcss.config.ts",
+}
+local tailwind_packages = {
+	["tailwindcss"] = true,
+	["@tailwindcss/vite"] = true,
+	["@tailwindcss/postcss"] = true,
+}
 
 local function get_ts_root(bufnr)
 	local filename = vim.api.nvim_buf_get_name(bufnr)
@@ -9,6 +24,57 @@ end
 
 local function has_local_tsgo(root)
 	return root and vim.uv.fs_stat(root .. "/node_modules/.bin/tsgo") ~= nil
+end
+
+local function has_tailwind_dependency(dependencies)
+	if type(dependencies) ~= "table" then
+		return false
+	end
+
+	for package_name in pairs(tailwind_packages) do
+		if dependencies[package_name] ~= nil then
+			return true
+		end
+	end
+
+	return false
+end
+
+local function package_json_has_tailwind(package_json_path)
+	local ok, lines = pcall(vim.fn.readfile, package_json_path)
+	if not ok then
+		return false
+	end
+
+	local ok_json, package_json = pcall(vim.json.decode, table.concat(lines, "\n"))
+	if not ok_json or type(package_json) ~= "table" then
+		return false
+	end
+
+	return has_tailwind_dependency(package_json.dependencies)
+		or has_tailwind_dependency(package_json.devDependencies)
+		or has_tailwind_dependency(package_json.peerDependencies)
+		or has_tailwind_dependency(package_json.optionalDependencies)
+end
+
+local function get_tailwind_root(bufnr)
+	local filename = vim.api.nvim_buf_get_name(bufnr)
+	local config_root = vim.fs.root(filename, tailwind_root_markers)
+	if config_root then
+		return config_root
+	end
+
+	local package_json_paths = vim.fs.find("package.json", {
+		path = filename,
+		upward = true,
+		limit = 20,
+	})
+
+	for _, package_json_path in ipairs(package_json_paths) do
+		if package_json_has_tailwind(package_json_path) then
+			return vim.fs.dirname(package_json_path)
+		end
+	end
 end
 
 -- Configure tsgo with more memory
@@ -76,13 +142,45 @@ vim.lsp.config("gopls", {
 	},
 })
 
+vim.lsp.config("tailwindcss", {
+	-- Avoid nvim-lspconfig's Tailwind v4 `.git` fallback, which can start a
+	-- second monorepo-root server for non-Tailwind packages.
+	root_dir = function(bufnr, on_dir)
+		local root = get_tailwind_root(bufnr)
+		if root then
+			on_dir(root)
+		end
+	end,
+	filetypes = {
+		"html",
+		"css",
+		"scss",
+		"postcss",
+		"javascript",
+		"javascriptreact",
+		"typescript",
+		"typescriptreact",
+		"mdx",
+		"vue",
+		"svelte",
+	},
+	settings = {
+		tailwindCSS = {
+			hovers = true,
+			suggestions = true,
+			colorDecorators = true,
+			classFunctions = { "cn", "clsx", "cva", "tw", "twMerge" },
+		},
+	},
+})
+
 -- Enable servers (configs come from nvim-lspconfig)
 vim.lsp.enable({
 	"tsgo",
 	"ts_ls",
 	"oxlint",
 	"gopls",
-	-- "tailwindcss",
+	"tailwindcss",
 	"eslint",
 	"prettier",
 	"biome",

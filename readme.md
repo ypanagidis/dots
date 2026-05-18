@@ -27,4 +27,19 @@ custom-packages/flake.nix # Custom package overlay
 sudo nixos-rebuild switch --flake .#nixos
 ```
 
+## Editor Tooling
+
+Neovim tools are configured in `modules/ides/nvim-config/` and installed through
+Home Manager's `programs.neovim.extraPackages`.
+
+- `oxlint` and `oxfmt` are pinned in `custom-packages/flake.nix` to Oxc's
+  upstream `apps_v*` GitHub release binaries. This avoids waiting for nixpkgs
+  updates and avoids local Rust/pnpm source builds.
+- Tailwind CSS LSP is enabled with custom root detection. The upstream
+  nvim-lspconfig Tailwind v4 fallback can use `.git` as a root, which starts a
+  monorepo-root server for packages that do not use Tailwind. The local config
+  only starts Tailwind when a Tailwind/PostCSS config exists or a nearby
+  `package.json` depends on `tailwindcss`, `@tailwindcss/vite`, or
+  `@tailwindcss/postcss`.
+
 The previous multi-host and macOS layout is preserved on the `multihost-config` branch.

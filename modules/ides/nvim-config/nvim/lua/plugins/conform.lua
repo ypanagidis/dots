@@ -28,8 +28,8 @@ conform.setup({
 	formatters = {
 		oxfmt = {
 			command = "oxfmt",
-			stdin = true,
-			args = { "--stdin-filepath", "$FILENAME" },
+			stdin = false,
+			args = { "--write", "$FILENAME" },
 			cwd = util.root_file({ ".oxfmtrc.json", "package.json", ".git" }),
 		},
 	},

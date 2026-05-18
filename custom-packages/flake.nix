@@ -56,6 +56,40 @@
         let
           lib = prev.lib;
           system = prev.stdenv.hostPlatform.system;
+          oxcAppsVersion = "1.65.0";
+          oxcBinaryHashes = {
+            x86_64-linux = {
+              oxfmt = "sha256-kjwshpk6+hrn2NxsViXJm3gpTanoNCBuAIRGSmDPK7M=";
+              oxlint = "sha256-TmN/rfL1ZnWNad85+JF8+QYBHK6ggO7Bbm4V+IeZ0rI=";
+              target = "x86_64-unknown-linux-musl";
+            };
+          };
+          oxcBinaryForSystem =
+            oxcBinaryHashes.${system} or (throw "Unsupported Oxc binary system: ${system}");
+          oxcBinary =
+            pname: version:
+            final.stdenvNoCC.mkDerivation {
+              inherit pname version;
+
+              src = final.fetchurl {
+                url = "https://github.com/oxc-project/oxc/releases/download/apps_v${oxcAppsVersion}/${pname}-${oxcBinaryForSystem.target}.tar.gz";
+                hash = oxcBinaryForSystem.${pname};
+              };
+
+              sourceRoot = ".";
+              dontBuild = true;
+
+              installPhase = ''
+                runHook preInstall
+                install -Dm755 ${pname}-${oxcBinaryForSystem.target} $out/bin/${pname}
+                runHook postInstall
+              '';
+
+              meta = {
+                mainProgram = pname;
+                platforms = [ system ];
+              };
+            };
           hasSystemPackages =
             flake: builtins.hasAttr "packages" flake && builtins.hasAttr system flake.packages;
           hasPackage =
@@ -72,62 +106,10 @@
           # pscale
           pscale = nixpkgs-unstable.legacyPackages.${system}.pscale;
 
-          # oxfmt 0.44.0 (latest)
-          oxfmt =
-            let
-              base = nixpkgs-unstable.legacyPackages.${system}.oxfmt;
-            in
-            base.overrideAttrs (old: rec {
-              version = "0.44.0";
-              src = final.fetchFromGitHub {
-                owner = "oxc-project";
-                repo = "oxc";
-                tag = "oxfmt_v${version}";
-                hash = "sha256-o4vacOuKNUdLdkd6v94jQcevA8dCXG32fYmO2ZEj330=";
-              };
-              # No patchedDependencies in 0.44.0, so remove the postPatch
-              postPatch = "";
-              env = (old.env or { }) // {
-                OXC_VERSION = version;
-              };
-              cargoDeps = final.rustPlatform.fetchCargoVendor {
-                inherit src;
-                pname = "oxfmt";
-                inherit version;
-                hash = "sha256-lppnmePEmbguoDDGyIM3gWbEX0ShgymoCjvrx1tK2Lw=";
-              };
-              pnpmDeps = final.fetchPnpmDeps {
-                inherit src version;
-                pname = "oxfmt";
-                pnpm = final.pnpm_10;
-                fetcherVersion = 2;
-                hash = "sha256-RvJnpb5+rFThGXpMX8uY0/D/3i62/RMdcOPFYMT1/uA=";
-              };
-            });
+          # Oxc publishes prebuilt CLI binaries on the apps release.
+          oxfmt = oxcBinary "oxfmt" "0.50.0";
 
-          # oxlint 1.59.0 (latest)
-          oxlint =
-            let
-              base = nixpkgs-unstable.legacyPackages.${system}.oxlint;
-            in
-            base.overrideAttrs (old: rec {
-              version = "1.59.0";
-              src = final.fetchFromGitHub {
-                owner = "oxc-project";
-                repo = "oxc";
-                tag = "oxlint_v${version}";
-                hash = "sha256-o4vacOuKNUdLdkd6v94jQcevA8dCXG32fYmO2ZEj330=";
-              };
-              env = (old.env or { }) // {
-                OXC_VERSION = version;
-              };
-              cargoDeps = final.rustPlatform.fetchCargoVendor {
-                inherit src;
-                pname = "oxlint";
-                inherit version;
-                hash = "sha256-lppnmePEmbguoDDGyIM3gWbEX0ShgymoCjvrx1tK2Lw=";
-              };
-            });
+          oxlint = oxcBinary "oxlint" "1.65.0";
 
           # tailwindcss-language-server 0.14.29 (latest)
           tailwindcss-language-server = prev.tailwindcss-language-server.overrideAttrs (old: rec {
