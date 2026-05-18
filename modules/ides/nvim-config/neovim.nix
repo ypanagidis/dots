@@ -1,7 +1,8 @@
-{ pkgs, ... }:
+{ pkgs, pkgsUnstable, ... }:
 {
   programs.neovim = {
     enable = true;
+    package = pkgsUnstable.neovim-unwrapped;
 
     extraLuaConfig =
       builtins.readFile ./nvim/lua/options.lua + builtins.readFile ./nvim/lua/keymaps.lua;
