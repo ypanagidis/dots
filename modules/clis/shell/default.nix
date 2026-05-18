@@ -79,6 +79,12 @@ in
     };
 
     initContent = ''
+      # Use Neovim as man-db's pager while keeping `man 2 write` as a normal
+      # terminal command. man-db strips formatting on pipes unless this is set.
+      export MAN_KEEP_FORMATTING=1
+      export MANPAGER='nvim +Man!'
+      export MANWIDTH=999
+
       # ---------------------------------------------------------
       # 1. KEY MAPPING FIXES
       # ---------------------------------------------------------

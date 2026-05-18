@@ -15,6 +15,8 @@
     fd
     htop
     nil
+    man-pages
+    man-pages-posix
 
     # Hardware and system inspection tools belong system-wide because they are
     # often used while debugging boot, drivers, USB, PCI, storage, and audio.
