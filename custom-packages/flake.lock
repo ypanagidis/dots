@@ -281,15 +281,15 @@
         "nixpkgs": "nixpkgs_3"
       },
       "locked": {
-        "lastModified": 1779039890,
-        "narHash": "sha256-aCoajfdfNsEq5YGFwX+YKkC6Bo19f34BbKt3wJ1FNmA=",
-        "owner": "anomalyco",
+        "lastModified": 1779063122,
+        "narHash": "sha256-G+eORXo9gDxL+GBkVnM4ingLTXHfL4CU06APhB7u06s=",
+        "owner": "sst",
         "repo": "opencode",
-        "rev": "f98449c9b5ef95444911e26206abb3d6479e6883",
+        "rev": "71b27a1b0fb52744554f2d10012f9cc467ce27c3",
         "type": "github"
       },
       "original": {
-        "owner": "anomalyco",
+        "owner": "sst",
         "repo": "opencode",
         "type": "github"
       }
@@ -302,7 +302,6 @@
         "nixpkgs-unstable": "nixpkgs-unstable",
         "nordvpn-flake": "nordvpn-flake",
         "opencode-flake": "opencode-flake",
-        "typescript-go": "typescript-go",
         "winapps": "winapps"
       }
     },
@@ -348,23 +347,6 @@
       "original": {
         "owner": "nix-systems",
         "repo": "default",
-        "type": "github"
-      }
-    },
-    "typescript-go": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1776791350,
-        "narHash": "sha256-6zwE+KsGMEnu3R8320J212qCR6yqNBHD3fgW3vUQvD0=",
-        "owner": "microsoft",
-        "repo": "typescript-go",
-        "rev": "fdea8102676c0f3f5027b026a9bd4f289c1c471c",
-        "type": "github"
-      },
-      "original": {
-        "owner": "microsoft",
-        "repo": "typescript-go",
-        "rev": "fdea8102676c0f3f5027b026a9bd4f289c1c471c",
         "type": "github"
       }
     },

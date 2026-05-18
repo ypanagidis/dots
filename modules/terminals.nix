@@ -32,7 +32,7 @@
   programs.ghostty = {
     enable = true;
     settings = {
-      font-size = 15;
+      font-size = 16;
       theme = "cyberdream";
       window-decoration = false;
       gtk-titlebar = false;

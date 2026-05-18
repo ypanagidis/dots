@@ -5,18 +5,13 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
     nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixos-unstable";
 
-    typescript-go = {
-      url = "github:microsoft/typescript-go/fdea8102676c0f3f5027b026a9bd4f289c1c471c";
-      flake = false;
-    };
-
     nix-vscode-extensions = {
       url = "github:nix-community/nix-vscode-extensions";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
     opencode-flake = {
-      url = "github:anomalyco/opencode";
+      url = "github:sst/opencode";
     };
 
     claude = {
@@ -44,7 +39,7 @@
       winapps,
       nordvpn-flake,
       ...
-    }@inputs:
+    }:
     {
       nixosModules = {
         nordvpn = nordvpn-flake.nixosModules.default;
@@ -64,8 +59,16 @@
               target = "x86_64-unknown-linux-musl";
             };
           };
+          tsgoBinaryHashes = {
+            x86_64-linux = {
+              hash = "sha512-qUrJWTB5/wv4wnRG0TRXElAxc2kykNiRNyEIEqBbLmzDlrcvAW7RRy8MXoY1ZyTiKGMu14itZ3x9oW6+blFpRw==";
+              package = "native-preview-linux-x64";
+            };
+          };
           oxcBinaryForSystem =
             oxcBinaryHashes.${system} or (throw "Unsupported Oxc binary system: ${system}");
+          tsgoBinaryForSystem =
+            tsgoBinaryHashes.${system} or (throw "Unsupported tsgo binary system: ${system}");
           oxcBinary =
             pname: version:
             final.stdenvNoCC.mkDerivation {
@@ -90,11 +93,51 @@
                 platforms = [ system ];
               };
             };
+          tsgoBinary =
+            version:
+            final.stdenvNoCC.mkDerivation {
+              pname = "tsgo";
+              inherit version;
+
+              src = final.fetchurl {
+                url = "https://registry.npmjs.org/@typescript/${tsgoBinaryForSystem.package}/-/${tsgoBinaryForSystem.package}-${version}.tgz";
+                inherit (tsgoBinaryForSystem) hash;
+              };
+
+              sourceRoot = "package";
+              dontBuild = true;
+
+              installPhase = ''
+                runHook preInstall
+                mkdir -p $out/lib/typescript-go $out/bin
+                cp -R lib/* $out/lib/typescript-go/
+                chmod +x $out/lib/typescript-go/tsgo
+                ln -s $out/lib/typescript-go/tsgo $out/bin/tsgo
+                runHook postInstall
+              '';
+
+              meta = {
+                mainProgram = "tsgo";
+                platforms = [ system ];
+              };
+            };
           hasSystemPackages =
             flake: builtins.hasAttr "packages" flake && builtins.hasAttr system flake.packages;
           hasPackage =
             flake: packageName:
             hasSystemPackages flake && builtins.hasAttr packageName flake.packages.${system};
+          opencodePackage =
+            package:
+            package.overrideAttrs (old: {
+              # Upstream currently requires bun 1.3.14, but the flake's
+              # nixpkgs input still provides 1.3.13. Keep using the upstream
+              # flake package while allowing that patch-level skew.
+              postPatch = ''
+                ${old.postPatch or ""}
+                substituteInPlace package.json \
+                  --replace-fail '"packageManager": "bun@1.3.14"' '"packageManager": "bun@1.3.13"'
+              '';
+            });
         in
         {
           # VSCode extensions
@@ -107,7 +150,7 @@
           pscale = nixpkgs-unstable.legacyPackages.${system}.pscale;
 
           # Oxc publishes prebuilt CLI binaries on the apps release.
-          oxfmt = oxcBinary "oxfmt" "0.50.0";
+          oxfmt = oxcBinary "oxfmt" "1.65.0";
 
           oxlint = oxcBinary "oxlint" "1.65.0";
 
@@ -136,28 +179,14 @@
             };
           });
 
-          # Custom builds
-          tsgo =
-            let
-              go126 = nixpkgs-unstable.legacyPackages.${system}.go_1_26;
-            in
-            final.buildGoModule.override { go = go126; } {
-              pname = "tsgo";
-              version = "7.0.0-dev.20260421.2";
-              src = inputs.typescript-go;
-              vendorHash = "sha256-n2wBDcMSKQGUJlTgCuJbKPTYOCiwkMpbvavqIrRvzS8=";
-              subPackages = [ "cmd/tsgo" ];
-              doCheck = false;
-            };
+          # TypeScript publishes prebuilt native preview binaries on npm.
+          tsgo = tsgoBinary "7.0.0-dev.20260421.2";
         }
         // lib.optionalAttrs (hasPackage opencode-flake "opencode") {
-          # Upstream anomalyco/opencode already ships a flake package. Use it
-          # directly instead of carrying a local nixpkgs import, Bun override,
-          # and source patch in this overlay.
-          opencode = opencode-flake.packages.${system}.opencode;
+          opencode = opencodePackage opencode-flake.packages.${system}.opencode;
         }
         // lib.optionalAttrs (hasPackage opencode-flake "opencode-desktop") {
-          opencode-desktop = opencode-flake.packages.${system}.opencode-desktop;
+          opencode-desktop = opencodePackage opencode-flake.packages.${system}.opencode-desktop;
         }
         // lib.optionalAttrs (hasPackage claude "default") {
           claude = claude.packages.${system}.default;

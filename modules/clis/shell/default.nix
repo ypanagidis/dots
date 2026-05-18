@@ -153,7 +153,7 @@ in
         local original_dir="$PWD"
         cd ~/nixcfg || return 1
 
-        if nix flake update custom-packages/opencode-flake; then
+        if ./update-annoying.sh opencode; then
           echo "Rebuilding..."
           re
         else
