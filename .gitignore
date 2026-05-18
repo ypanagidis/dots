@@ -1,4 +1,7 @@
 result
-hosts/nixos/nix-pc/system/firmware/BT_RAM_CODE_MT6639_2_1_hdr.bin
-hosts/nixos/nix-pc/system/firmware/mtkbt.dat
-hosts/nixos/nix-pc/system/firmware/asus-bt-driver.zip
+system/firmware/BT_RAM_CODE_MT6639_2_1_hdr.bin
+system/firmware/WIFI_MT6639_PATCH_MCU_2_1_hdr.bin
+system/firmware/WIFI_RAM_CODE_MT6639_2_1.bin
+system/firmware/mtkbt.dat
+system/firmware/asus-bt-driver.zip
+system/firmware/asus-wifi-driver.zip

@@ -10,13 +10,24 @@ let
 
   firmwareDir = toString ./firmware;
   firmwareBinName = "BT_RAM_CODE_MT6639_2_1_hdr.bin";
+  wifiRamName = "WIFI_RAM_CODE_MT6639_2_1.bin";
+  wifiPatchName = "WIFI_MT6639_PATCH_MCU_2_1_hdr.bin";
+  mt76Mt7927Rev = "fe66fdd55ccdc03dd1a44188da5a7d6946599107";
+  asusBtDriverUrl = "https://dlcdnets.asus.com/pub/ASUS/mb/02BT/DRV_Bluetooth_MTK_MT7925_27_TP_W11_64_V111460576_20260417R.zip";
+  asusWifiDriverUrl = "https://dlcdnets.asus.com/pub/ASUS/mb/08WIRELESS/DRV_WiFi_MTK_MT7925_27_TP_W11_64_V5705659_20260417R.zip";
   firmwareBinPath = "${firmwareDir}/${firmwareBinName}";
+  wifiRamPath = "${firmwareDir}/${wifiRamName}";
+  wifiPatchPath = "${firmwareDir}/${wifiPatchName}";
   firmwareDatPath = "${firmwareDir}/mtkbt.dat";
   firmwareZipPath = "${firmwareDir}/asus-bt-driver.zip";
+  wifiZipPath = "${firmwareDir}/asus-wifi-driver.zip";
 
   firmwareBinExists = builtins.pathExists firmwareBinPath;
+  wifiRamExists = builtins.pathExists wifiRamPath;
+  wifiPatchExists = builtins.pathExists wifiPatchPath;
   firmwareDatExists = builtins.pathExists firmwareDatPath;
   firmwareZipExists = builtins.pathExists firmwareZipPath;
+  wifiZipExists = builtins.pathExists wifiZipPath;
 
   firmwareBin =
     if firmwareBinExists then
@@ -36,6 +47,24 @@ let
     else
       null;
 
+  wifiRam =
+    if wifiRamExists then
+      builtins.path {
+        path = wifiRamPath;
+        name = wifiRamName;
+      }
+    else
+      null;
+
+  wifiPatch =
+    if wifiPatchExists then
+      builtins.path {
+        path = wifiPatchPath;
+        name = wifiPatchName;
+      }
+    else
+      null;
+
   firmwareZip =
     if firmwareZipExists then
       builtins.path {
@@ -43,7 +72,22 @@ let
         name = "asus-bt-driver.zip";
       }
     else
-      null;
+      pkgs.fetchurl {
+        url = asusBtDriverUrl;
+        hash = "sha256-f1nNsbpqqUcnDHrVebzI1IY/+ge4ddQSb/UMDuNkXUI=";
+      };
+
+  wifiZip =
+    if wifiZipExists then
+      builtins.path {
+        path = wifiZipPath;
+        name = "asus-wifi-driver.zip";
+      }
+    else
+      pkgs.fetchurl {
+        url = asusWifiDriverUrl;
+        hash = "sha256-Tiqx9/vzewqoe7eLZbHWyEWoRF/pIedsu9beja8dRTs=";
+      };
 
   mt7927BluetoothModules = pkgs.stdenv.mkDerivation {
     pname = "mt7927-bluetooth-modules";
@@ -301,6 +345,47 @@ let
     '';
   };
 
+  mt7927WifiModules = pkgs.stdenv.mkDerivation {
+    pname = "mt7927-wifi-modules";
+    version = "2026-04-27-${lib.substring 0 7 mt76Mt7927Rev}-${kernel.version}";
+
+    src = pkgs.fetchFromGitHub {
+      owner = "morrownr";
+      repo = "mt76";
+      rev = mt76Mt7927Rev;
+      hash = "sha256-/AyNFGXk8iZEAy9zuSHLZ5bEBGz83IASdYpLXz84xrk=";
+    };
+
+    nativeBuildInputs = kernel.moduleBuildDependencies ++ [ pkgs.bc ];
+
+    strictDeps = true;
+    enableParallelBuilding = true;
+    hardeningDisable = [ "pic" ];
+    dontConfigure = true;
+
+    buildPhase = ''
+      runHook preBuild
+
+      make \
+        -C "${kernel.dev}/lib/modules/${kernel.modDirVersion}/build" \
+        M="$PWD" \
+        NPROC="$NIX_BUILD_CORES" \
+        modules
+
+      runHook postBuild
+    '';
+
+    installPhase = ''
+      runHook preInstall
+
+      installDir="$out/lib/modules/${kernel.modDirVersion}/updates/drivers/net/wireless/mediatek/mt76"
+      mkdir -p "$installDir"
+      find . -name '*_git.ko' -exec cp {} "$installDir/" \;
+
+      runHook postInstall
+    '';
+  };
+
   mt7927Firmware =
     if firmwareBinExists then
       pkgs.runCommandNoCC "mt7927-bluetooth-firmware" { } ''
@@ -326,7 +411,7 @@ let
           BT_RAM_CODE_MT6639_2_1_hdr.bin \
           $out/lib/firmware/mediatek/mt7927/${firmwareBinName}
       ''
-    else if firmwareZipExists then
+    else if firmwareZip != null then
       pkgs.runCommand "mt7927-bluetooth-firmware" { nativeBuildInputs = [ pkgs.python3 ]; } ''
         python3 - <<'PY'
         import struct
@@ -351,6 +436,100 @@ let
           BT_RAM_CODE_MT6639_2_1_hdr.bin \
           $out/lib/firmware/mediatek/mt7927/${firmwareBinName}
       ''
+    else if wifiZip != null then
+      pkgs.runCommand "mt7927-bluetooth-firmware" { nativeBuildInputs = [ pkgs.python3 ]; } ''
+        python3 - <<'PY'
+        import struct
+        import zipfile
+        from pathlib import Path
+
+
+        with zipfile.ZipFile("${wifiZip}") as zf:
+            members = [name for name in zf.namelist() if name.lower().endswith("/mtkwlan.dat") or name.lower() == "mtkwlan.dat"]
+            if not members:
+                raise SystemExit("mtkwlan.dat was not found in asus-wifi-driver.zip")
+            data = zf.read(members[0])
+
+        offset = 0x10
+        record_size = 0x4c
+        while offset + 72 <= len(data):
+            name = data[offset:offset + 64].split(b"\0", 1)[0].decode("ascii", "ignore")
+            if not name:
+                break
+            data_offset = struct.unpack_from("<I", data, offset + 64)[0]
+            data_size = struct.unpack_from("<I", data, offset + 68)[0]
+            if name == "${firmwareBinName}":
+                if data_offset + data_size > len(data):
+                    raise SystemExit(f"invalid payload range for {name}")
+                Path(name).write_bytes(data[data_offset:data_offset + data_size])
+                break
+            offset += record_size
+        else:
+            raise SystemExit("${firmwareBinName} was not found in mtkwlan.dat")
+        PY
+
+        install -Dm644 \
+          ${firmwareBinName} \
+          $out/lib/firmware/mediatek/mt7927/${firmwareBinName}
+      ''
+    else
+      null;
+
+  mt7927WifiFirmware =
+    if wifiRamExists && wifiPatchExists then
+      pkgs.runCommandNoCC "mt7927-wifi-firmware" { } ''
+        install -Dm644 \
+          ${wifiRam} \
+          $out/lib/firmware/mediatek/mt7927/${wifiRamName}
+        install -Dm644 \
+          ${wifiPatch} \
+          $out/lib/firmware/mediatek/mt7927/${wifiPatchName}
+      ''
+    else if wifiZip != null then
+      pkgs.runCommand "mt7927-wifi-firmware" { nativeBuildInputs = [ pkgs.python3 ]; } ''
+        python3 - <<'PY'
+        import struct
+        import zipfile
+        from pathlib import Path
+
+
+        required = {
+            "${wifiRamName}",
+            "${wifiPatchName}",
+        }
+
+        with zipfile.ZipFile("${wifiZip}") as zf:
+            members = [name for name in zf.namelist() if name.lower().endswith("/mtkwlan.dat") or name.lower() == "mtkwlan.dat"]
+            if not members:
+                raise SystemExit("mtkwlan.dat was not found in asus-wifi-driver.zip")
+            data = zf.read(members[0])
+
+        offset = 0x10
+        record_size = 0x4c
+        while offset + 72 <= len(data):
+            name = data[offset:offset + 64].split(b"\0", 1)[0].decode("ascii", "ignore")
+            if not name:
+                break
+            data_offset = struct.unpack_from("<I", data, offset + 64)[0]
+            data_size = struct.unpack_from("<I", data, offset + 68)[0]
+            if name in required:
+                if data_offset + data_size > len(data):
+                    raise SystemExit(f"invalid payload range for {name}")
+                Path(name).write_bytes(data[data_offset:data_offset + data_size])
+            offset += record_size
+
+        missing = [name for name in required if not Path(name).exists()]
+        if missing:
+            raise SystemExit(f"missing firmware in mtkwlan.dat: {', '.join(missing)}")
+        PY
+
+        install -Dm644 \
+          ${wifiRamName} \
+          $out/lib/firmware/mediatek/mt7927/${wifiRamName}
+        install -Dm644 \
+          ${wifiPatchName} \
+          $out/lib/firmware/mediatek/mt7927/${wifiPatchName}
+      ''
     else
       null;
 
@@ -359,8 +538,18 @@ let
 
     rc=0
     fw_rel="mediatek/mt7927/BT_RAM_CODE_MT6639_2_1_hdr.bin"
+    wifi_ram_rel="mediatek/mt7927/WIFI_RAM_CODE_MT6639_2_1.bin"
+    wifi_patch_rel="mediatek/mt7927/WIFI_MT6639_PATCH_MCU_2_1_hdr.bin"
 
     printf '== MT7927 Bluetooth sanity check ==\n'
+
+    bt_usb_out="$(${pkgs.usbutils}/bin/lsusb 2>/dev/null | ${pkgs.ripgrep}/bin/rg -i '0489:|13d3:' || true)"
+    if [ -n "$bt_usb_out" ]; then
+      printf '[ OK ] possible MT7927 Bluetooth USB device present:\n%s\n' "$bt_usb_out"
+    else
+      printf '[FAIL] expected MT7927 Bluetooth USB device is not enumerated (expected 0489:* or 13d3:*)\n'
+      rc=1
+    fi
 
     btusb_path="$(${pkgs.kmod}/bin/modinfo -n btusb 2>/dev/null || true)"
     if [ -z "$btusb_path" ]; then
@@ -376,6 +565,31 @@ let
       fi
     fi
 
+    printf '\n== MT7927 Wi-Fi status ==\n'
+
+    wifi_pci="$(${pkgs.pciutils}/bin/lspci -Dnn -d 14c3:6639 2>/dev/null || true)"
+    if [ -n "$wifi_pci" ]; then
+      printf '[INFO] MT7927/MT6639 PCI device:\n%s\n' "$wifi_pci"
+    else
+      printf '[WARN] no 14c3:6639 Wi-Fi PCI device found\n'
+    fi
+
+    if ${pkgs.kmod}/bin/modinfo mt7925e_git 2>/dev/null | ${pkgs.ripgrep}/bin/rg -q 'pci:v000014C3d00006639'; then
+      printf '[ OK ] mt7925e_git advertises the 14c3:6639 alias\n'
+    elif ${pkgs.kmod}/bin/modinfo mt7925e 2>/dev/null | ${pkgs.ripgrep}/bin/rg -q 'pci:v000014C3d00006639'; then
+      printf '[ OK ] mt7925e advertises the 14c3:6639 alias\n'
+    else
+      printf '[WARN] neither mt7925e_git nor mt7925e advertises the 14c3:6639 alias\n'
+    fi
+
+    for wifi_rel in "$wifi_ram_rel" "$wifi_patch_rel"; do
+      if [ -f "/run/current-system/firmware/$wifi_rel" ] || [ -f "/run/current-system/firmware/$wifi_rel.zst" ] || [ -f "/run/current-system/firmware/$wifi_rel.xz" ] || [ -f "/lib/firmware/$wifi_rel" ] || [ -f "/lib/firmware/$wifi_rel.zst" ] || [ -f "/lib/firmware/$wifi_rel.xz" ]; then
+        printf '[ OK ] Wi-Fi firmware present (%s or compressed variant)\n' "$wifi_rel"
+      else
+        printf '[WARN] Wi-Fi firmware missing (%s)\n' "$wifi_rel"
+      fi
+    done
+
     if [ -f "/run/current-system/firmware/$fw_rel" ] || [ -f "/run/current-system/firmware/$fw_rel.zst" ] || [ -f "/run/current-system/firmware/$fw_rel.xz" ] || [ -f "/lib/firmware/$fw_rel" ] || [ -f "/lib/firmware/$fw_rel.zst" ] || [ -f "/lib/firmware/$fw_rel.xz" ]; then
       printf '[ OK ] firmware present (%s or compressed variant)\n' "$fw_rel"
     else
@@ -386,18 +600,20 @@ let
     if ${pkgs.systemd}/bin/systemctl is-active --quiet bluetooth.service; then
       printf '[ OK ] bluetooth.service is active\n'
     else
-      printf '[WARN] bluetooth.service is not active\n'
+      printf '[FAIL] bluetooth.service is not active\n'
+      rc=1
     fi
 
     adapter_out="$(${pkgs.coreutils}/bin/timeout 5 ${pkgs.bluez}/bin/bluetoothctl list 2>/dev/null || true)"
     if [ -n "$adapter_out" ]; then
       printf '[ OK ] bluetoothctl list:\n%s\n' "$adapter_out"
     else
-      printf '[WARN] bluetoothctl reported no controllers\n'
+      printf '[FAIL] bluetoothctl reported no controllers\n'
+      rc=1
     fi
 
     printf '\n[INFO] recent kernel lines (if accessible):\n'
-    if ${pkgs.util-linux}/bin/dmesg 2>/dev/null | ${pkgs.ripgrep}/bin/rg -i 'btmtk|mt7927|6639|btusb' | ${pkgs.coreutils}/bin/tail -n 25; then
+    if ${pkgs.util-linux}/bin/dmesg 2>/dev/null | ${pkgs.ripgrep}/bin/rg -i 'btmtk|mt7927|mt7925|6639|mt76|btusb|firmware' | ${pkgs.coreutils}/bin/tail -n 25; then
       :
     else
       printf 'dmesg not accessible or no matching lines\n'
@@ -413,14 +629,33 @@ let
   '';
 in
 {
-  boot.extraModulePackages = [ mt7927BluetoothModules ];
+  boot.extraModulePackages = [
+    mt7927BluetoothModules
+    mt7927WifiModules
+  ];
+
+  boot.blacklistedKernelModules = [
+    "mt76"
+    "mt76_connac_lib"
+    "mt792x_lib"
+    "mt792x_usb"
+    "mt7925_common"
+    "mt7925e"
+    "mt7925u"
+  ];
+
+  boot.extraModprobeConfig = ''
+    options mt7925_common_git disable_clc=N
+  '';
 
   hardware.bluetooth = {
     enable = true;
     powerOnBoot = true;
   };
 
-  hardware.firmware = lib.optionals (mt7927Firmware != null) [ mt7927Firmware ];
+  hardware.firmware =
+    lib.optionals (mt7927Firmware != null) [ mt7927Firmware ]
+    ++ lib.optionals (mt7927WifiFirmware != null) [ mt7927WifiFirmware ];
 
   environment.systemPackages = [ mt7927BtCheck ];
 
@@ -431,6 +666,7 @@ in
       - system/firmware/BT_RAM_CODE_MT6639_2_1_hdr.bin
       - system/firmware/mtkbt.dat
       - system/firmware/asus-bt-driver.zip
+      - system/firmware/asus-wifi-driver.zip
       See system/firmware/README.md for extraction details.
     ''
   ];
