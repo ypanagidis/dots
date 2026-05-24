@@ -22,7 +22,6 @@
     ./modules/steam.nix
     ./modules/crapple-display.nix
     ./modules/kdeconnect.nix
-    ./modules/logitech.nix
     ./modules/sunshine.nix
   ];
 

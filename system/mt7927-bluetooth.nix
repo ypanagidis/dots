@@ -243,10 +243,39 @@ let
 
       replace_once(
           "module-src/btmtk.c",
+          "\t\tif (!skb_pull_data(data->evt_skb,\n"
+          "\t\t\t\t   sizeof(wmt_evt_funcc->status))) {\n"
+          "\t\t\terr = -EINVAL;\n"
+          "\t\t\tgoto err_free_skb;\n"
+          "\t\t}",
+          "\t\tif (!skb_pull_data(data->evt_skb,\n"
+          "\t\t\t\t   sizeof(wmt_evt_funcc->status))) {\n"
+          "\t\t\tif (data->dev_id == 0x6639) {\n"
+          "\t\t\t\tstatus = BTMTK_WMT_ON_DONE;\n"
+          "\t\t\t\tbreak;\n"
+          "\t\t\t}\n"
+          "\t\t\terr = -EINVAL;\n"
+          "\t\t\tgoto err_free_skb;\n"
+          "\t\t}",
+      )
+
+      replace_once(
+          "module-src/btmtk.c",
           "\tif (err < 0 || !val)\n"
           "\t\tbt_dev_err(hdev, \"Can't get device id, subsys reset fail.\");",
           "\tif (err < 0 || (!val && dev_id != 0x6639))\n"
           "\t\tbt_dev_err(hdev, \"Can't get device id, subsys reset fail.\");",
+      )
+
+      replace_once(
+          "module-src/btmtk.c",
+          "\t/* Wait a few moments for firmware activation done */\n"
+          "\tusleep_range(100000, 120000);",
+          "\t/* MT6639 needs longer before it answers the next WMT command. */\n"
+          "\tif (dev_id == 0x6639)\n"
+          "\t\tmsleep(3000);\n"
+          "\telse\n"
+          "\t\tusleep_range(100000, 120000);",
       )
 
       replace_once(
@@ -645,6 +674,7 @@ in
   ];
 
   boot.extraModprobeConfig = ''
+    options btusb enable_autosuspend=0
     options mt7925_common_git disable_clc=N
   '';
 
@@ -658,6 +688,51 @@ in
     ++ lib.optionals (mt7927WifiFirmware != null) [ mt7927WifiFirmware ];
 
   environment.systemPackages = [ mt7927BtCheck ];
+
+  systemd.services.mt7927-bluetooth-recover = {
+    description = "Recover MT7927 Bluetooth controller when BlueZ sees no adapter";
+    wantedBy = [ "multi-user.target" ];
+    after = [
+      "bluetooth.service"
+      "systemd-udev-settle.service"
+    ];
+    wants = [ "bluetooth.service" ];
+
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+    };
+
+    script = ''
+      adapter_out="$(${pkgs.coreutils}/bin/timeout 5 ${pkgs.bluez}/bin/bluetoothctl list 2>/dev/null || true)"
+      if [ -n "$adapter_out" ]; then
+        exit 0
+      fi
+
+      for dev in /sys/bus/usb/devices/*; do
+        [ -f "$dev/idVendor" ] || continue
+        [ -f "$dev/idProduct" ] || continue
+        [ -w "$dev/authorized" ] || continue
+
+        vid="$(<"$dev/idVendor")"
+        pid="$(<"$dev/idProduct")"
+
+        case "$vid:$pid" in
+          0489:e13a|0489:e0fa|0489:e10f|0489:e110|0489:e116|13d3:3588)
+            ${pkgs.systemd}/bin/systemctl stop bluetooth.service
+            printf 0 > "$dev/authorized"
+            ${pkgs.coreutils}/bin/sleep 2
+            printf 1 > "$dev/authorized"
+            ${pkgs.coreutils}/bin/sleep 5
+            ${pkgs.systemd}/bin/systemctl start bluetooth.service
+            exit 0
+            ;;
+        esac
+      done
+
+      exit 0
+    '';
+  };
 
   warnings = lib.optionals (mt7927Firmware == null) [
     ''

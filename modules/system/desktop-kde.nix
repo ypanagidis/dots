@@ -26,9 +26,6 @@
     keyboards.default = {
       ids = [
         "*"
-        # logid exposes the MX Master thumb button through a 0000:0000 virtual
-        # keyboard. Do not let keyd re-emit that KEY_F13 into KDE shortcuts.
-        "-0000:0000"
       ];
       settings = {
         main = {
