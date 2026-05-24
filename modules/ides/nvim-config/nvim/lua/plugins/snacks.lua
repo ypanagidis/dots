@@ -138,7 +138,7 @@ map("n", "<leader>fw", function() Snacks.picker.grep_word() end, { desc = "Grep 
 map("n", "<leader>gc", function() Snacks.picker.git_log() end, { desc = "Git commits" })
 map("n", "<leader>gs", function() Snacks.picker.git_status() end, { desc = "Git status" })
 map("n", "<leader>gb", function() Snacks.picker.git_branches() end, { desc = "Git branches" })
-map("n", "<leader>gd", function() Snacks.picker.git_diff() end, { desc = "Git diff" })
+map("n", "<leader>gD", function() Snacks.picker.git_diff() end, { desc = "Git diff picker" })
 
 -- LSP
 map("n", "<leader>fs", function() Snacks.picker.lsp_symbols() end, { desc = "Document symbols" })
@@ -199,4 +199,3 @@ end
 map("n", "<leader>un", function()
 	Snacks.notifier.hide()
 end, { desc = "Dismiss All Notifications" })
-

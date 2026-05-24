@@ -38,7 +38,7 @@
 
       # Treesitter
       {
-        plugin = nvim-treesitter.withAllGrammars;
+        plugin = pkgsUnstable.vimPlugins.nvim-treesitter.withAllGrammars;
         type = "lua";
         config = builtins.readFile ./nvim/lua/plugins/treesitter.lua;
       }
@@ -146,6 +146,13 @@
         plugin = gitsigns-nvim;
         type = "lua";
         config = builtins.readFile ./nvim/lua/plugins/gitsigns.lua;
+      }
+
+      # VSCode-style git diff view
+      {
+        plugin = pkgsUnstable.vimPlugins.codediff-nvim;
+        type = "lua";
+        config = builtins.readFile ./nvim/lua/plugins/codediff.lua;
       }
 
       # TODO/FIXME highlighting

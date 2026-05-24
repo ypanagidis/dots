@@ -1,23 +1,12 @@
-require("nvim-treesitter.configs").setup({
-  -- Grammars are installed via Nix (nvim-treesitter.withAllGrammars)
-  -- so we don't need ensure_installed
+require("nvim-treesitter").setup()
 
-  highlight = {
-    enable = true,
-    additional_vim_regex_highlighting = false,
-  },
+vim.api.nvim_create_autocmd("FileType", {
+	callback = function()
+		local ok = pcall(vim.treesitter.start)
+		if not ok then
+			return
+		end
 
-  indent = {
-    enable = true,
-  },
-
-  incremental_selection = {
-    enable = true,
-    keymaps = {
-      init_selection = "<C-space>",
-      node_incremental = "<C-space>",
-      scope_incremental = false,
-      node_decremental = "<bs>",
-    },
-  },
+		vim.bo.indentexpr = "v:lua.require'nvim-treesitter'.indentexpr()"
+	end,
 })
