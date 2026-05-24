@@ -10,12 +10,6 @@ let
 in
 
 {
-  imports = [
-    # Obsidian is managed through its Home Manager module because the vault
-    # settings are declarative, not just a package install.
-    ../obsedian.nix
-  ];
-
   # User-facing desktop applications. These do not need to be system packages,
   # so they live in the Home Manager profile.
   home.packages =
@@ -29,6 +23,7 @@ in
       high-tide
       haruna
       bruno
+      obsidian
     ])
     ++ lib.optionals (pkgs ? winapps) [
       pkgs.winapps

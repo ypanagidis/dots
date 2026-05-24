@@ -23,6 +23,7 @@ in
       bun
       httpie
       pscale
+      graphite-cli
       opencode
       playwright-mcp
     ])

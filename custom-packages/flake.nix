@@ -51,11 +51,11 @@
         let
           lib = prev.lib;
           system = prev.stdenv.hostPlatform.system;
-          oxcAppsVersion = "1.65.0";
+          oxcAppsVersion = "1.66.0";
           oxcBinaryHashes = {
             x86_64-linux = {
-              oxfmt = "sha256-kjwshpk6+hrn2NxsViXJm3gpTanoNCBuAIRGSmDPK7M=";
-              oxlint = "sha256-TmN/rfL1ZnWNad85+JF8+QYBHK6ggO7Bbm4V+IeZ0rI=";
+              oxfmt = "sha256-zdZm2G0TVf+UNmAmyWyUa+dkjkpKEskOw6Vb/ihVFr4=";
+              oxlint = "sha256-eTOo/blrJjTfJKbtkWXF9n9D4ql9RFRAvBwXcJLSPic=";
               target = "x86_64-unknown-linux-musl";
             };
           };
@@ -150,9 +150,9 @@
           pscale = nixpkgs-unstable.legacyPackages.${system}.pscale;
 
           # Oxc publishes prebuilt CLI binaries on the apps release.
-          oxfmt = oxcBinary "oxfmt" "1.65.0";
+          oxfmt = oxcBinary "oxfmt" "1.66.0";
 
-          oxlint = oxcBinary "oxlint" "1.65.0";
+          oxlint = oxcBinary "oxlint" "1.66.0";
 
           # tailwindcss-language-server 0.14.29 (latest)
           tailwindcss-language-server = prev.tailwindcss-language-server.overrideAttrs (old: rec {
