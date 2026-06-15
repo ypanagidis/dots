@@ -1,0 +1,91 @@
+# Brewfile.full — complete snapshot of everything currently installed
+# (taps, formulae, casks, VSCode extensions). Generated with `brew bundle dump`.
+# Use `Brewfile` for the minimal dotfiles setup; use this to mirror the whole
+# machine:  brew bundle --file=Brewfile.full
+# Refresh anytime with:  brew bundle dump --file=Brewfile.full --force
+
+tap "dopplerhq/cli"
+tap "planetscale/tap"
+tap "steipete/tap"
+tap "withgraphite/tap"
+# Clone of cat(1) with syntax highlighting and Git integration
+brew "bat"
+# Generate compilation database for clang tooling
+brew "bear"
+# Formatting tools for C, C++, Obj-C, Java, JavaScript, TypeScript
+brew "clang-format"
+# Cross-platform make
+brew "cmake"
+# Modern, maintained replacement for ls
+brew "eza"
+# Simple, fast and user-friendly alternative to find
+brew "fd"
+# Play, record, convert, and stream select audio and video codecs
+brew "ffmpeg"
+# Fast and simple Node.js version manager
+brew "fnm"
+# Command-line fuzzy finder written in Go
+brew "fzf"
+# GitHub command-line tool
+brew "gh"
+# GNU Privacy Guard (OpenPGP)
+brew "gnupg"
+# Open source programming language to build simple/reliable/efficient software
+brew "go"
+# Stricter gofmt
+brew "gofumpt"
+# Go formatter that additionally inserts import statements
+brew "goimports"
+# Simple terminal UI for git commands
+brew "lazygit"
+# Open source relational database management system
+brew "mysql"
+# Incremental parsing library
+brew "tree-sitter"
+# Ambitious Vim-fork focused on extensibility and agility
+brew "neovim"
+# Small build system for use with gyp or CMake
+brew "ninja"
+# Command-line tool to format Nix language code
+brew "nixfmt"
+# General-purpose scripting language
+brew "php"
+# Interpreted, interactive, object-oriented programming language
+brew "python@3.14"
+# Cross-shell prompt for astronauts
+brew "starship"
+# Terminal multiplexer
+brew "tmux"
+# Parser generator tool
+brew "tree-sitter-cli"
+# Executes a program periodically, showing output fullscreen
+brew "watch"
+# Internet file retriever
+brew "wget"
+# Fish-like fast/unobtrusive autosuggestions for zsh
+brew "zsh-autosuggestions"
+# Fish shell like syntax highlighting for zsh
+brew "zsh-syntax-highlighting"
+# OpenAI's coding agent that runs in your terminal
+cask "codex"
+# Menu bar usage monitor for Codex and Claude
+cask "steipete/tap/codexbar"
+# Terminal emulator that uses platform-native UI and GPU acceleration
+cask "ghostty"
+vscode "bradlc.vscode-tailwindcss"
+vscode "eamodio.gitlens"
+vscode "github.github-vscode-theme"
+vscode "github.vscode-pull-request-github"
+vscode "llvm-vs-code-extensions.vscode-clangd"
+vscode "ms-azuretools.vscode-containers"
+vscode "ms-vscode-remote.remote-containers"
+vscode "ms-vscode.makefile-tools"
+vscode "nimda.deepdark-material"
+vscode "oxc.oxc-vscode"
+vscode "sdras.night-owl"
+vscode "teabyii.ayu"
+vscode "typescriptteam.native-preview"
+vscode "vadimcn.vscode-lldb"
+vscode "vscodevim.vim"
+vscode "zhuangtongfa.material-theme"
+npm "corepack"

@@ -13,7 +13,11 @@ git-managed plugins), Neovim, tmux, and Ghostty.
 | `.config/ghostty/`       | `~/.config/ghostty/`   | Ghostty terminal                            |
 | `.config/tmux/`          | `~/.config/tmux/`      | tmux helper scripts                         |
 | `.tmux.conf`             | `~/.tmux.conf`         | tmux config                                 |
-| `Brewfile`               | —                      | Homebrew packages                           |
+| `.config/lazygit/`       | `~/.config/lazygit/`   | lazygit config                              |
+| `.config/git/`           | `~/.config/git/`       | global git ignore                           |
+| `.gitconfig`             | `~/.gitconfig`         | git user (name/email)                       |
+| `Brewfile`               | —                      | minimal packages for this setup             |
+| `Brewfile.full`          | —                      | full snapshot of everything installed       |
 
 ### How the zsh config is wired
 
@@ -68,6 +72,9 @@ cd ~/Developer/dots
 brew bundle --file=Brewfile
 ```
 
+To instead mirror the *entire* machine (everything I had installed — extra CLIs,
+casks, VSCode extensions), use the full snapshot: `brew bundle --file=Brewfile.full`.
+
 ### 5. Node + pnpm
 
 Node is managed by `fnm` (installed in the previous step). Install an LTS and
@@ -99,6 +106,9 @@ ln -snf "$DOTS/.config/nvim"     "$HOME/.config/nvim"
 ln -snf "$DOTS/.config/ghostty"  "$HOME/.config/ghostty"
 ln -snf "$DOTS/.config/tmux"     "$HOME/.config/tmux"
 ln -snf "$DOTS/.tmux.conf"       "$HOME/.tmux.conf"
+ln -snf "$DOTS/.config/lazygit"  "$HOME/.config/lazygit"
+ln -snf "$DOTS/.config/git"      "$HOME/.config/git"
+ln -snf "$DOTS/.gitconfig"       "$HOME/.gitconfig"
 ```
 
 > `ln -snf` overwrites an existing symlink in place. If a **real** file/dir is
@@ -112,6 +122,31 @@ zsh plugins — you'll see "Installing …" lines once, then never again.
 
 That's it. Open Neovim (`nvim`) and lazy.nvim will install its plugins on first
 run as well.
+
+### 9. tmux plugins (optional)
+
+`.tmux.conf` uses TPM plugins (`vim-tmux-navigator`, `tmux-yank`). The config
+degrades gracefully without them, but to get the full set install TPM and the
+plugins:
+
+```sh
+git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm
+```
+
+Then start tmux and press `prefix` + `I` (capital i) to install the plugins
+(prefix is `Ctrl-s`).
+
+### 10. A Nerd Font (optional, for icons)
+
+The prompt (starship), `eza`, and the tmux status line use Nerd Font glyphs.
+Ghostty is set to `Menlo`, which lacks them, so icons may show as boxes until a
+Nerd Font is installed and selected:
+
+```sh
+brew install --cask font-symbols-only-nerd-font   # or any "*-nerd-font" cask
+```
+
+Then set `font-family` in `.config/ghostty/config` to the installed font.
 
 ---
 
@@ -127,3 +162,5 @@ run as well.
 - macOS already uses zsh as the default login shell, so no `chsh` is needed.
 - Plugins, lock files, and caches are gitignored — only source config is tracked.
 - `gnupg` is included for git commit signing; `GPG_TTY` is exported in `.zshenv`.
+- **Not tracked here:** Karabiner, Zed, Raycast, and other app GUIs. This repo
+  covers shell, Neovim, tmux, Ghostty, lazygit, and git.
