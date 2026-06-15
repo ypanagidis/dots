@@ -1,22 +1,8 @@
-# Aliases extracted from the Nix shell setup for plain macOS use.
-
-c() {
-  if command -v cursor >/dev/null 2>&1; then
-    cursor .
-  elif command -v code >/dev/null 2>&1; then
-    code .
-  else
-    echo "Neither cursor nor code is installed"
-    return 1
-  fi
-}
-
-alias lgit="lazygit"
 alias p="pnpm"
 alias cm="cd ~/Developer/Work/UP/mono/"
 alias cs="cd ~/Developer/sandbox/"
 alias sa="cd ~/Developer/OS/Sealant/"
-alias mc="mc-prism"
+alias wr="cd ~/Developer/Work/Webroot/"
 alias n="nvim"
 alias lg="lazygit"
 
