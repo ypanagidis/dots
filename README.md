@@ -16,6 +16,7 @@ git-managed plugins), Neovim, tmux, and Ghostty.
 | `.config/lazygit/`       | `~/.config/lazygit/`   | lazygit config                              |
 | `.config/git/`           | `~/.config/git/`       | global git ignore                           |
 | `.gitconfig`             | `~/.gitconfig`         | git user (name/email)                       |
+| `Library/.../Code/User/` | VSCode `User/`         | VSCode `keybindings.json` + `settings.json` |
 | `Brewfile`               | —                      | minimal packages for this setup             |
 | `Brewfile.full`          | —                      | full snapshot of everything installed       |
 
@@ -109,6 +110,12 @@ ln -snf "$DOTS/.tmux.conf"       "$HOME/.tmux.conf"
 ln -snf "$DOTS/.config/lazygit"  "$HOME/.config/lazygit"
 ln -snf "$DOTS/.config/git"      "$HOME/.config/git"
 ln -snf "$DOTS/.gitconfig"       "$HOME/.gitconfig"
+
+# VSCode keymaps + settings (note the spaces in the path)
+VSCODE="$HOME/Library/Application Support/Code/User"
+mkdir -p "$VSCODE"
+ln -snf "$DOTS/Library/Application Support/Code/User/keybindings.json" "$VSCODE/keybindings.json"
+ln -snf "$DOTS/Library/Application Support/Code/User/settings.json"    "$VSCODE/settings.json"
 ```
 
 > `ln -snf` overwrites an existing symlink in place. If a **real** file/dir is
@@ -163,4 +170,4 @@ Then set `font-family` in `.config/ghostty/config` to the installed font.
 - Plugins, lock files, and caches are gitignored — only source config is tracked.
 - `gnupg` is included for git commit signing; `GPG_TTY` is exported in `.zshenv`.
 - **Not tracked here:** Karabiner, Zed, Raycast, and other app GUIs. This repo
-  covers shell, Neovim, tmux, Ghostty, lazygit, and git.
+  covers shell, Neovim, tmux, Ghostty, lazygit, git, and VSCode keymaps/settings.
