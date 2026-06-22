@@ -27,10 +27,9 @@ vim.opt.rtp:prepend(lazypath)
 require("lazy").setup({
 	spec = {
 		{
-			"Shatur/neovim-ayu",
+			"nvim-lualine/lualine.nvim",
 			priority = 1000,
 			lazy = false,
-			dependencies = { "nvim-lualine/lualine.nvim" },
 			config = function()
 				require("plugins.ui")
 			end,
@@ -249,7 +248,7 @@ require("lazy").setup({
 		},
 	},
 	install = {
-		colorscheme = { "ayu-dark" },
+		colorscheme = { "mono-charcoal", "default" },
 	},
 	checker = {
 		enabled = true,
