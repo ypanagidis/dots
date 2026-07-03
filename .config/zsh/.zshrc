@@ -57,8 +57,12 @@ zstyle ':completion:*' matcher-list 'm:{a-z}={A-Za-z}'  # lowercase input matche
 # # Fuzzy finder
 # # =========================================================
 #
+# # Linux / Arch / CachyOS
+if [[ -f /usr/share/fzf/key-bindings.zsh ]]; then
+  source /usr/share/fzf/key-bindings.zsh
+  source /usr/share/fzf/completion.zsh
 # # macOS / Homebrew (Apple Silicon)
-if [[ -f /opt/homebrew/opt/fzf/shell/key-bindings.zsh ]]; then
+elif [[ -f /opt/homebrew/opt/fzf/shell/key-bindings.zsh ]]; then
   source /opt/homebrew/opt/fzf/shell/key-bindings.zsh
   source /opt/homebrew/opt/fzf/shell/completion.zsh
 fi
@@ -84,3 +88,11 @@ source "$ZDOTDIR/node.zsh"
 #
 # # Prompt/theme
 source "$ZDOTDIR/prompt.zsh"
+
+# pnpm
+export PNPM_HOME="/home/yiannis/.local/share/pnpm"
+case ":$PATH:" in
+  *":$PNPM_HOME:"*) ;;
+  *) export PATH="$PNPM_HOME:$PATH" ;;
+esac
+# pnpm end

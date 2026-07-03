@@ -1,0 +1,157 @@
+binds {
+
+    // ────────────── Keybindings ──────────────
+    // https://github.com/YaLTeR/niri/wiki/Configuration:-Key-Bindings
+
+    // ─── noctalia-shell keybinds ───
+    // https://docs.noctalia.dev/getting-started/keybinds/
+
+    Mod+Shift+ESCAPE                     { show-hotkey-overlay; }
+
+    // ─── Applications ───
+    Mod+Return                          hotkey-overlay-title="Open Terminal: Ghostty" { spawn "ghostty"; }
+    Mod+CTRL+Return                     hotkey-overlay-title="Open App Launcher: noctalia launcher" { spawn-sh "qs -c noctalia-shell ipc call launcher toggle"; }
+    Mod+B                               hotkey-overlay-title="Open Browser: firefox" { spawn "firefox"; }
+    Mod+ALT+L                           hotkey-overlay-title="Lock Screen: noctalia lock" { spawn-sh "qs -c noctalia-shell ipc call lockScreen lock"; }
+    Mod+Shift+Q                        hotkey-overlay-title="Session Menu: noctalia sessionMenu" { spawn-sh "qs -c noctalia-shell ipc call sessionMenu toggle"; }
+
+    // Please choose your own file manager.
+    Mod+E                               hotkey-overlay-title="File Manager: Nautilus" { spawn "nautilus"; }
+
+    // ─── Media Controls ───
+    XF86AudioRaiseVolume                allow-when-locked=true { spawn-sh "qs -c noctalia-shell ipc call volume increase"; }
+    XF86AudioLowerVolume                allow-when-locked=true { spawn-sh "qs -c noctalia-shell ipc call volume decrease"; }
+    XF86AudioMute                       allow-when-locked=true { spawn-sh "qs -c noctalia-shell ipc call volume muteOutput"; }
+    XF86AudioMicMute                    allow-when-locked=true { spawn-sh "qs -c noctalia-shell ipc call volume muteInput"; }
+    XF86AudioNext                       allow-when-locked=true { spawn-sh "qs -c noctalia-shell ipc call media next"; }
+    XF86AudioPrev                       allow-when-locked=true { spawn-sh "qs -c noctalia-shell ipc call media previous"; }
+    XF86AudioPlay                       allow-when-locked=true { spawn-sh "qs -c noctalia-shell ipc call media playPause"; }
+    XF86AudioPause                      allow-when-locked=true { spawn-sh "qs -c noctalia-shell ipc call media playPause"; }
+
+    // ─── Brightness Controls ───
+    XF86MonBrightnessUp                 allow-when-locked=true { spawn-sh "qs -c noctalia-shell ipc call brightness increase"; }
+    XF86MonBrightnessDown               allow-when-locked=true { spawn-sh "qs -c noctalia-shell ipc call brightness decrease"; }
+
+    // ─── Window Movement and Focus ───
+    Mod+Q                               { close-window; }
+
+    CTRL+ALT+Shift+Super+Left           { focus-column-left; }
+    CTRL+ALT+Shift+Super+H              { focus-column-left; }
+    CTRL+ALT+Shift+Super+Right          { focus-column-right; }
+    CTRL+ALT+Shift+Super+L              { focus-column-right; }
+    CTRL+ALT+Shift+Super+Up             { focus-workspace-up; }
+    CTRL+ALT+Shift+Super+K              { focus-workspace-up; }
+    CTRL+ALT+Shift+Super+Down           { focus-workspace-down; }
+    CTRL+ALT+Shift+Super+J              { focus-workspace-down; }
+
+    Mod+CTRL+Left                       { move-column-left; }
+    Mod+CTRL+H                          { move-column-left; }
+    Mod+CTRL+Right                      { move-column-right; }
+    Mod+CTRL+L                          { move-column-right; }
+    Mod+CTRL+UP                         { move-window-up; }
+    Mod+CTRL+K                          { move-window-up; }
+    Mod+CTRL+Down                       { move-window-down; }
+    Mod+CTRL+J                          { move-window-down; }
+
+    Mod+Home                            { focus-column-first; }
+    Mod+End                             { focus-column-last; }
+    Mod+CTRL+Home                       { move-column-to-first; }
+    Mod+CTRL+End                        { move-column-to-last; }
+
+    CTRL+ALT+Shift+Super+BracketLeft    { focus-monitor-left; }
+    CTRL+ALT+Shift+Super+BracketRight   { focus-monitor-right; }
+    CTRL+ALT+Shift+Super+Page_Up        { focus-monitor-up; }
+    CTRL+ALT+Shift+Super+Page_Down      { focus-monitor-down; }
+
+    Mod+Shift+CTRL+Left                 { move-column-to-monitor-left; }
+    Mod+Shift+CTRL+Right                { move-column-to-monitor-right; }
+    Mod+Shift+CTRL+UP                   { move-column-to-monitor-up; }
+    Mod+Shift+CTRL+Down                 { move-column-to-monitor-down; }
+
+    // ─── Workspace Switching ───
+    Mod+WheelScrollDown                 cooldown-ms=150 { focus-workspace-down; }
+    Mod+WheelScrollUp                   cooldown-ms=150 { focus-workspace-up; }
+    Mod+CTRL+WheelScrollDown            cooldown-ms=150 { move-column-to-workspace-down; }
+    Mod+CTRL+WheelScrollUp              cooldown-ms=150 { move-column-to-workspace-up; }
+
+    Mod+WheelScrollRight                { focus-column-right; }
+    Mod+WheelScrollLeft                 { focus-column-left; }
+    Mod+CTRL+WheelScrollRight           { move-column-right; }
+    Mod+CTRL+WheelScrollLeft            { move-column-left; }
+
+    Mod+Shift+WheelScrollDown           { focus-column-right; }
+    Mod+Shift+WheelScrollUp             { focus-column-left; }
+    Mod+CTRL+Shift+WheelScrollDown      { move-column-right; }
+    Mod+CTRL+Shift+WheelScrollUp        { move-column-left; }
+
+    CTRL+ALT+Shift+Super+1              hotkey-overlay-title="Open Context: UP" { spawn "/home/yiannis/.local/bin/niri-open-context" "UP"; }
+    CTRL+ALT+Shift+Super+2              hotkey-overlay-title="Open Context: Webroot" { spawn "/home/yiannis/.local/bin/niri-open-context" "Webroot"; }
+    CTRL+ALT+Shift+Super+3              hotkey-overlay-title="Open Context: Sealant" { spawn "/home/yiannis/.local/bin/niri-open-context" "Sealant"; }
+    CTRL+ALT+Shift+Super+4              hotkey-overlay-title="Open Context: Side" { spawn "/home/yiannis/.local/bin/niri-open-context" "Side"; }
+    CTRL+ALT+Shift+Super+5              hotkey-overlay-title="Open Context: Admin" { spawn "/home/yiannis/.local/bin/niri-open-context" "Admin"; }
+    Mod+6                               { focus-workspace 6; }
+    Mod+7                               { focus-workspace 7; }
+    Mod+8                               { focus-workspace 8; }
+    Mod+9                               { focus-workspace 9; }
+
+    Mod+CTRL+1                          { move-column-to-workspace "UP"; }
+    Mod+CTRL+2                          { move-column-to-workspace "Webroot"; }
+    Mod+CTRL+3                          { move-column-to-workspace "Sealant"; }
+    Mod+CTRL+4                          { move-column-to-workspace "Side"; }
+    Mod+CTRL+5                          { move-column-to-workspace "Admin"; }
+    Mod+CTRL+6                          { move-column-to-workspace 6; }
+    Mod+CTRL+7                          { move-column-to-workspace 7; }
+    Mod+CTRL+8                          { move-column-to-workspace 8; }
+    Mod+CTRL+9                          { move-column-to-workspace 9; }
+
+    Mod+TAB                             { focus-workspace-previous; }
+
+    // ─── Niri developer workflow ───
+    // Your Hyper key emits CTRL+ALT+Shift+Super. Since Shift is already part of
+    // Hyper, "Hyper+Shift+..." cannot be a distinct Niri binding.
+    CTRL+ALT+Shift+Super+A              hotkey-overlay-title="Context Browser: Helium" { spawn "/home/yiannis/.local/bin/niri-open-context" "current" "browser"; }
+    CTRL+ALT+Shift+Super+G              hotkey-overlay-title="Context Editor: tmux dev" { spawn "/home/yiannis/.local/bin/niri-open-context" "current" "editor"; }
+    CTRL+ALT+Shift+Super+C              hotkey-overlay-title="Context Terminal: tmux terminal" { spawn "/home/yiannis/.local/bin/niri-open-context" "current" "terminal"; }
+    CTRL+ALT+Shift+Super+R              hotkey-overlay-title="Context Agents: tmux/herdr" { spawn "/home/yiannis/.local/bin/niri-open-context" "current" "agents"; }
+    CTRL+ALT+Shift+Super+T              hotkey-overlay-title="Top Ambient: Spotify" { spawn "/home/yiannis/.local/bin/niri-open-spotify"; }
+    CTRL+ALT+Shift+Super+F              hotkey-overlay-title="Frontend Mode" { spawn "/home/yiannis/.local/bin/niri-frontend-mode"; }
+    CTRL+ALT+Shift+Super+Escape         hotkey-overlay-title="Top Ambient" { spawn "/home/yiannis/.local/bin/niri-top-ambient"; }
+    CTRL+ALT+Shift+Super+V              hotkey-overlay-title="Restore Comms Layout" { spawn "/home/yiannis/.local/bin/niri-layout-comms"; }
+    CTRL+ALT+Shift+Super+D              hotkey-overlay-title="Move Window to DevTools Workspace" { spawn "/home/yiannis/.local/bin/niri-move-focused-devtools"; }
+
+    // ─── Layout Controls ───
+    Mod+CTRL+F                          { expand-column-to-available-width; }
+    Mod+ALT+C                           { center-column; }
+    Mod+CTRL+C                          { center-visible-columns; }
+    Mod+M                               { maximize-window-to-edges; }
+    Mod+CTRL+M                          { maximize-column; }
+    Mod+CTRL+R                          { switch-preset-column-width; }
+    Mod+Minus                           { set-column-width "-10%"; }
+    Mod+Equal                           { set-column-width "+10%"; }
+    Mod+Shift+Minus                     { set-window-height "-10%"; }
+    Mod+Shift+Equal                     { set-window-height "+10%"; }
+
+    // ─── Modes ───
+    Mod+T                               { toggle-window-floating; }
+    Mod+Shift+M                         { fullscreen-window; }
+    Mod+W                               { toggle-column-tabbed-display; }
+
+    // ─── Screenshots ───
+    Print                               { screenshot; }
+    Mod+Shift+S                         { screenshot; }
+    CTRL+Print                          { screenshot-screen; }
+    ALT+Print                           { screenshot-window; }
+    CTRL+Shift+1                        { screenshot; }
+    CTRL+Shift+2                        { screenshot-screen; }
+    CTRL+Shift+3                        { screenshot-window; }
+
+    // ─── Emergency Escape Key ───
+    // Use this when a fullscreen app blocks your keybinds.
+    // It disables any active keyboard shortcut inhibitor, restoring control.
+    Mod+ESCAPE                          allow-inhibiting=false { toggle-keyboard-shortcuts-inhibit; }
+
+    // ─── Exit / Power ───
+    CTRL+ALT+Delete                     { quit; } // Also quits Niri
+    Mod+Shift+P                         { power-off-monitors; } // Turn off screens (useful for OLED or privacy)
+    Mod+O                               repeat=false { toggle-overview; }
+}

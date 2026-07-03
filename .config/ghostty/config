@@ -1,5 +1,6 @@
-font-family = Menlo
-font-size = 20
+command = /usr/bin/zsh
+font-family = MesloLGS Nerd Font Mono
+font-size = 14
 adjust-cell-height = 25%
 copy-on-select = clipboard
 background = #1b1b1d
@@ -26,6 +27,5 @@ palette = 15=#ffffff
 background-opacity = 0.86
 background-opacity-cells = true
 background-blur = true
-macos-titlebar-style = transparent
 window-padding-x = 10
 window-padding-y = 8

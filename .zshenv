@@ -17,3 +17,9 @@ fi
 # The real .zshenv / .zshrc and friends live in $ZDOTDIR.
 export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
 export ZDOTDIR="$XDG_CONFIG_HOME/zsh"
+
+# zsh does not re-read $ZDOTDIR/.zshenv after ZDOTDIR is set here, so source the
+# real XDG env file explicitly.
+if [[ -r "$ZDOTDIR/.zshenv" ]]; then
+  source "$ZDOTDIR/.zshenv"
+fi

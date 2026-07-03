@@ -5,6 +5,7 @@ alias sa="cd ~/Developer/OS/Sealant/"
 alias wr="cd ~/Developer/Work/Webroot/"
 alias n="nvim"
 alias lg="lazygit"
+alias c="claude --dangerously-skip-permissions"
 
 if command -v eza >/dev/null 2>&1; then
   alias l="eza --icons=always"

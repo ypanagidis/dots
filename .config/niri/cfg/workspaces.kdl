@@ -1,0 +1,46 @@
+// ────────────── Niri Developer Workflow Workspaces ──────────────
+// Output names verified with `niri msg outputs` on 2026-07-02.
+
+workspace "UP" {
+    open-on-output "DP-1"
+}
+
+workspace "Webroot" {
+    open-on-output "DP-1"
+}
+
+workspace "Sealant" {
+    open-on-output "DP-1"
+}
+
+workspace "Side" {
+    open-on-output "DP-1"
+}
+
+workspace "Admin" {
+    open-on-output "DP-1"
+}
+
+workspace "top-ambient" {
+    open-on-output "DP-2"
+}
+
+workspace "UP-devtools" {
+    open-on-output "DP-2"
+}
+
+workspace "Webroot-devtools" {
+    open-on-output "DP-2"
+}
+
+workspace "Sealant-devtools" {
+    open-on-output "DP-2"
+}
+
+workspace "Side-devtools" {
+    open-on-output "DP-2"
+}
+
+workspace "comms" {
+    open-on-output "HDMI-A-1"
+}
