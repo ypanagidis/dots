@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+TOP_OUTPUT="DP-2"
+TOP_WORKSPACE="top-ambient"
+SPOTIFY_APP_ID="Spotify"
+
+niri_action() {
+    niri msg action "$@" >/dev/null
+}
+
+spotify_window_id() {
+    niri msg --json windows \
+        | jq -r --arg app_id "$SPOTIFY_APP_ID" '
+            .[] | select(.app_id == $app_id or ((.title // "") | test("spotify"; "i"))) | .id
+        ' \
+        | head -n 1
+}
+
+focus_spotify_window() {
+    local id="$1"
+    niri_action move-window-to-workspace --window-id "$id" --focus false "$TOP_WORKSPACE" || true
+    niri_action move-window-to-monitor --id "$id" "$TOP_OUTPUT" || true
+    niri_action focus-monitor "$TOP_OUTPUT"
+    niri_action focus-workspace "$TOP_WORKSPACE"
+    niri_action focus-window --id "$id" || true
+}
+
+launch_spotify() {
+    if command -v spotify-launcher >/dev/null 2>&1; then
+        setsid -f spotify-launcher >/dev/null 2>&1
+    elif command -v spotify >/dev/null 2>&1; then
+        setsid -f spotify >/dev/null 2>&1
+    else
+        printf 'spotify-launcher or spotify is not installed\n' >&2
+        exit 1
+    fi
+}
+
+id="$(spotify_window_id)"
+if [[ -n "$id" ]]; then
+    focus_spotify_window "$id"
+    exit 0
+fi
+
+niri_action focus-monitor "$TOP_OUTPUT"
+niri_action focus-workspace "$TOP_WORKSPACE"
+launch_spotify
+
+for _ in {1..120}; do
+    id="$(spotify_window_id)"
+    if [[ -n "$id" ]]; then
+        focus_spotify_window "$id"
+        exit 0
+    fi
+    sleep 0.25
+done
+
+exit 0

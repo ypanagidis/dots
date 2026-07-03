@@ -84,11 +84,11 @@ binds {
     Mod+CTRL+Shift+WheelScrollDown      { move-column-right; }
     Mod+CTRL+Shift+WheelScrollUp        { move-column-left; }
 
-    CTRL+ALT+Shift+Super+1              hotkey-overlay-title="Open Context: UP" { spawn "/home/yiannis/.local/bin/niri-open-context" "UP"; }
-    CTRL+ALT+Shift+Super+2              hotkey-overlay-title="Open Context: Webroot" { spawn "/home/yiannis/.local/bin/niri-open-context" "Webroot"; }
-    CTRL+ALT+Shift+Super+3              hotkey-overlay-title="Open Context: Sealant" { spawn "/home/yiannis/.local/bin/niri-open-context" "Sealant"; }
-    CTRL+ALT+Shift+Super+4              hotkey-overlay-title="Open Context: Side" { spawn "/home/yiannis/.local/bin/niri-open-context" "Side"; }
-    CTRL+ALT+Shift+Super+5              hotkey-overlay-title="Open Context: Admin" { spawn "/home/yiannis/.local/bin/niri-open-context" "Admin"; }
+    CTRL+ALT+Shift+Super+1              hotkey-overlay-title="Open Context: UP" repeat=false { spawn "/home/yiannis/.local/bin/niri-ctx" "open" "UP"; }
+    CTRL+ALT+Shift+Super+2              hotkey-overlay-title="Open Context: Webroot" repeat=false { spawn "/home/yiannis/.local/bin/niri-ctx" "open" "Webroot"; }
+    CTRL+ALT+Shift+Super+3              hotkey-overlay-title="Open Context: Sealant" repeat=false { spawn "/home/yiannis/.local/bin/niri-ctx" "open" "Sealant"; }
+    CTRL+ALT+Shift+Super+4              hotkey-overlay-title="Open Context: Side" repeat=false { spawn "/home/yiannis/.local/bin/niri-ctx" "open" "Side"; }
+    CTRL+ALT+Shift+Super+5              hotkey-overlay-title="Open Context: Admin" repeat=false { spawn "/home/yiannis/.local/bin/niri-ctx" "open" "Admin"; }
     Mod+6                               { focus-workspace 6; }
     Mod+7                               { focus-workspace 7; }
     Mod+8                               { focus-workspace 8; }
@@ -109,15 +109,15 @@ binds {
     // ─── Niri developer workflow ───
     // Your Hyper key emits CTRL+ALT+Shift+Super. Since Shift is already part of
     // Hyper, "Hyper+Shift+..." cannot be a distinct Niri binding.
-    CTRL+ALT+Shift+Super+A              hotkey-overlay-title="Context Browser: Helium" { spawn "/home/yiannis/.local/bin/niri-open-context" "current" "browser"; }
-    CTRL+ALT+Shift+Super+G              hotkey-overlay-title="Context Editor: tmux dev" { spawn "/home/yiannis/.local/bin/niri-open-context" "current" "editor"; }
-    CTRL+ALT+Shift+Super+C              hotkey-overlay-title="Context Terminal: tmux terminal" { spawn "/home/yiannis/.local/bin/niri-open-context" "current" "terminal"; }
-    CTRL+ALT+Shift+Super+R              hotkey-overlay-title="Context Agents: tmux/herdr" { spawn "/home/yiannis/.local/bin/niri-open-context" "current" "agents"; }
-    CTRL+ALT+Shift+Super+T              hotkey-overlay-title="Top Ambient: Spotify" { spawn "/home/yiannis/.local/bin/niri-open-spotify"; }
-    CTRL+ALT+Shift+Super+F              hotkey-overlay-title="Frontend Mode" { spawn "/home/yiannis/.local/bin/niri-frontend-mode"; }
-    CTRL+ALT+Shift+Super+Escape         hotkey-overlay-title="Top Ambient" { spawn "/home/yiannis/.local/bin/niri-top-ambient"; }
-    CTRL+ALT+Shift+Super+V              hotkey-overlay-title="Restore Comms Layout" { spawn "/home/yiannis/.local/bin/niri-layout-comms"; }
-    CTRL+ALT+Shift+Super+D              hotkey-overlay-title="Move Window to DevTools Workspace" { spawn "/home/yiannis/.local/bin/niri-move-focused-devtools"; }
+    CTRL+ALT+Shift+Super+A              hotkey-overlay-title="Context Docs: Helium" repeat=false { spawn "/home/yiannis/.local/bin/niri-ctx" "open" "current" "docs"; }
+    CTRL+ALT+Shift+Super+G              hotkey-overlay-title="Context Editor: tmux dev" repeat=false { spawn "/home/yiannis/.local/bin/niri-ctx" "open" "current" "editor"; }
+    CTRL+ALT+Shift+Super+C              hotkey-overlay-title="Context Terminal: tmux terminal" repeat=false { spawn "/home/yiannis/.local/bin/niri-ctx" "open" "current" "term"; }
+    CTRL+ALT+Shift+Super+R              hotkey-overlay-title="Context Agents: tmux/herdr" repeat=false { spawn "/home/yiannis/.local/bin/niri-ctx" "open" "current" "agents"; }
+    CTRL+ALT+Shift+Super+T              hotkey-overlay-title="Top Ambient: Spotify" repeat=false { spawn "/home/yiannis/.local/bin/niri-ctx" "spotify"; }
+    CTRL+ALT+Shift+Super+F              hotkey-overlay-title="Frontend Mode" repeat=false { spawn "/home/yiannis/.local/bin/niri-ctx" "frontend"; }
+    CTRL+ALT+Shift+Super+Escape         hotkey-overlay-title="Top Ambient" repeat=false { spawn "/home/yiannis/.local/bin/niri-ctx" "top-ambient"; }
+    CTRL+ALT+Shift+Super+V              hotkey-overlay-title="Restore Comms Layout" repeat=false { spawn "/home/yiannis/.local/bin/niri-ctx" "comms"; }
+    CTRL+ALT+Shift+Super+D              hotkey-overlay-title="Move Window to DevTools Workspace" repeat=false { spawn "/home/yiannis/.local/bin/niri-ctx" "devtools-here"; }
 
     // ─── Layout Controls ───
     Mod+CTRL+F                          { expand-column-to-available-width; }

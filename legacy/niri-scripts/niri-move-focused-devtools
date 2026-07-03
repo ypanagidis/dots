@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+MAIN_OUTPUT="DP-1"
+TOP_OUTPUT="DP-2"
+
+normalize_context() {
+    local raw="${1:-}" lower
+    lower="$(printf '%s\n' "$raw" | tr '[:upper:]' '[:lower:]')"
+    case "$lower" in
+        up|job1) printf 'UP\n' ;;
+        webroot|job2) printf 'Webroot\n' ;;
+        sealant|side1) printf 'Sealant\n' ;;
+        side|side2) printf 'Side\n' ;;
+        *) return 1 ;;
+    esac
+}
+
+context_from_workspace() {
+    local ws="${1:-}" ctx_raw
+    ctx_raw="$(printf '%s\n' "$ws" | sed -E 's/-devtools$//')"
+    normalize_context "$ctx_raw"
+}
+
+active_workspace_on_output() {
+    local output="$1"
+    niri msg --json workspaces \
+        | jq -r --arg output "$output" '.[] | select(.output == $output and .is_active) | .name // empty' \
+        | head -n 1
+}
+
+id="$(niri msg --json focused-window | jq -r '.id // empty')"
+[[ -n "$id" ]] || exit 0
+
+focused_ws="$(niri msg --json workspaces | jq -r '.[] | select(.is_focused) | .name // empty' | head -n 1)"
+if ! ctx="$(context_from_workspace "$focused_ws")"; then
+    main_ws="$(active_workspace_on_output "$MAIN_OUTPUT")"
+    if ! ctx="$(context_from_workspace "$main_ws")"; then
+        printf 'could not infer project context from focused workspace "%s" or main workspace "%s"\n' "${focused_ws:-unnamed}" "${main_ws:-unnamed}" >&2
+        exit 2
+    fi
+fi
+
+devtools_ws="${ctx}-devtools"
+niri msg action focus-monitor "$MAIN_OUTPUT" >/dev/null
+niri msg action focus-workspace "$ctx" >/dev/null
+niri msg action focus-monitor "$TOP_OUTPUT" >/dev/null
+niri msg action focus-workspace "$devtools_ws" >/dev/null
+niri msg action move-window-to-workspace --window-id "$id" --focus false "$devtools_ws" >/dev/null
+niri msg action move-window-to-monitor --id "$id" "$TOP_OUTPUT" >/dev/null || true
+niri msg action focus-monitor "$MAIN_OUTPUT" >/dev/null
+niri msg action focus-workspace "$ctx" >/dev/null

@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+niri msg action focus-column-right >/dev/null
+
+ws="$(niri msg --json workspaces | jq -r '.[] | select(.is_focused) | .name // empty' | head -n 1)"
+win="$(niri msg --json focused-window)"
+app_id="$(printf '%s\n' "$win" | jq -r '.app_id // empty')"
+
+case "$ws" in
+    UP|Webroot|Sealant|Side|job1|job2|side1|side2)
+        case "$ws" in
+            job1) ctx="UP" ;;
+            job2) ctx="Webroot" ;;
+            side1) ctx="Sealant" ;;
+            side2) ctx="Side" ;;
+            *) ctx="$ws" ;;
+        esac
+        if [[ "$app_id" == "helium" ]]; then
+            niri msg action focus-monitor "DP-2" >/dev/null
+            niri msg action focus-workspace "${ctx}-devtools" >/dev/null
+            niri msg action focus-monitor "DP-1" >/dev/null
+        elif [[ "${NIRI_SMART_TOP:-leave}" == "ambient" ]]; then
+            niri-top-ambient
+        fi
+        ;;
+esac

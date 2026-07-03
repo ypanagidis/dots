@@ -7,19 +7,19 @@
     // Slack: app_id "slack"; Discord: app_id "discord".
     // Telegram: app_id "org.telegram.desktop".
     window-rule {
-        match app-id="slack"
+        match app-id=r#"^slack$"#
         open-on-output "HDMI-A-1"
         open-on-workspace "comms"
     }
 
     window-rule {
-        match app-id="discord"
+        match app-id=r#"^discord$"#
         open-on-output "HDMI-A-1"
         open-on-workspace "comms"
     }
 
     window-rule {
-        match app-id="org.telegram.desktop"
+        match app-id=r#"^org\.telegram\.desktop$"#
         open-on-output "HDMI-A-1"
         open-on-workspace "comms"
     }
@@ -27,20 +27,46 @@
     // Spotify app ID captured from `niri msg --json windows` on 2026-07-03:
     // Spotify: app_id "Spotify".
     window-rule {
-        match app-id="Spotify"
+        match app-id=r#"^Spotify$"#
         open-on-output "DP-2"
         open-on-workspace "top-ambient"
     }
 
+    // Context terminal app IDs are set by niri-ctx.
+    window-rule {
+        match app-id=r#"^dev\.yiannis\.niri\.up\.(editor|agents|logs|term)$"#
+        open-on-workspace "UP"
+    }
+
+    window-rule {
+        match app-id=r#"^dev\.yiannis\.niri\.webroot\.(editor|agents|logs|term)$"#
+        open-on-workspace "Webroot"
+    }
+
+    window-rule {
+        match app-id=r#"^dev\.yiannis\.niri\.sealant\.(editor|agents|logs|term)$"#
+        open-on-workspace "Sealant"
+    }
+
+    window-rule {
+        match app-id=r#"^dev\.yiannis\.niri\.side\.(editor|agents|logs|term)$"#
+        open-on-workspace "Side"
+    }
+
+    window-rule {
+        match app-id=r#"^dev\.yiannis\.niri\.admin\.(editor|agents|logs|term)$"#
+        open-on-workspace "Admin"
+    }
+
      // if you use steam you will probably like these
     window-rule {
-        match app-id="steam"
+        match app-id=r#"^steam$"#
         exclude title=r#"^[Ss]team$"#
         open-floating true
     }
 
     window-rule {
-       match app-id="steam" title=r#"^notificationtoasts_\d+_desktop$"#
+       match app-id=r#"^steam$"# title=r#"^notificationtoasts_\d+_desktop$"#
        default-floating-position x=10 y=10 relative-to="bottom-right"
        open-focused false
     }

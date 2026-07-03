@@ -1,16 +1,30 @@
 # Niri Developer Workflow
 
-## Monitor roles
+This setup is driven by one dispatcher:
 
-- `DP-1`: `MAIN_BOTTOM`, primary active work display.
-- `DP-2`: `TOP`, passive display above main, used for ambient workspaces and frontend DevTools.
-- `HDMI-A-1`: `VERTICAL`, rotated ultrawide comms display.
+```sh
+/home/yiannis/.local/bin/niri-ctx
+```
 
-`DP-1` is focused at startup by `cfg/autostart.kdl` with `focus-monitor "DP-1"` and `focus-workspace "UP"`.
+The niri config lives in this repo, and `~/.config/niri` is expected to point here. Project-specific settings are in `.config/niri/contexts.conf`; keybindings call `niri-ctx`, while window rules handle stable placement.
+
+## Monitors
+
+- `DP-1`: main work display.
+- `DP-2`: top display for `top-ambient` and project DevTools workspaces.
+- `HDMI-A-1`: comms display.
+
+Startup runs:
+
+```sh
+niri-ctx startup
+```
+
+That waits until niri has the `UP` workspace on `DP-1`, then focuses it without triggering workspace back-and-forth.
 
 ## Workspaces
 
-Main workspaces on `DP-1`:
+Project workspaces on `DP-1`:
 
 - `UP`
 - `Webroot`
@@ -20,7 +34,7 @@ Main workspaces on `DP-1`:
 
 Top workspaces on `DP-2`:
 
-- `top-ambient`: ambient/media workspace; Spotify opens here
+- `top-ambient`
 - `UP-devtools`
 - `Webroot-devtools`
 - `Sealant-devtools`
@@ -30,136 +44,249 @@ Comms workspace on `HDMI-A-1`:
 
 - `comms`
 
-## Card layout
-
-The default layout is one full-screen card per column:
-
-- `default-column-width { proportion 1.0; }`
-- `center-focused-column "always"`
-- `always-center-single-column`
-- preset widths: `1.0`, `0.66`, `0.5`, `0.33`
-
-Use `Mod+Left` / `Mod+Right` or `Mod+H` / `Mod+L` to move through cards.
-
 ## Hotkeys
 
-- Hyper emits `CTRL+ALT+Shift+Super` on this keyboard.
-- `Hyper+1`: open/focus `UP`
-- `Hyper+2`: open/focus `Webroot`
-- `Hyper+3`: open/focus `Sealant`
-- `Hyper+4`: open/focus `Side`
-- `Hyper+5`: open/focus `Admin`
-- `Hyper+A`: focus/open current context Helium search/docs browser
-- `Hyper+G`: focus/open current context editor terminal
-- `Hyper+C`: focus/open current context normal terminal
-- `Hyper+R`: focus/open current context agent terminal
-- `Hyper+T`: focus/open Spotify on `top-ambient`
-- `Hyper+Left`, `Hyper+Right`, `Hyper+H`, `Hyper+L`: previous/next card
-- `Hyper+Up`, `Hyper+Down`, `Hyper+K`, `Hyper+J`: workspace up/down on current monitor
-- `Hyper+[`, `Hyper+]`: focus monitor left/right
-- `Hyper+Page_Up`, `Hyper+Page_Down`: focus monitor up/down
-- `Hyper+V`: open missing comms apps and restore comms layout
-- `Hyper+F`: enter frontend mode for current context
-- `Hyper+Escape`: return `TOP` to `top-ambient`
-- `Hyper+D`: align TOP to the current context DevTools workspace, move the focused DevTools window there, then return focus to MAIN
-- `Mod+Ctrl+R`: cycle preset column widths
-- `Mod+Ctrl+M`: toggle maximized column
-- `Mod+M`: maximize window to edges
-- `Mod+Shift+M`: fullscreen window
+Hyper on this keyboard emits `CTRL+ALT+Shift+Super`. Because Shift is already part of Hyper, `Hyper+Shift+...` is not a distinct binding shape.
 
-`Hyper+Shift+...` is not a separate binding shape here because Hyper already depresses Shift.
+- `Hyper+1`: `niri-ctx open UP`
+- `Hyper+2`: `niri-ctx open Webroot`
+- `Hyper+3`: `niri-ctx open Sealant`
+- `Hyper+4`: `niri-ctx open Side`
+- `Hyper+5`: `niri-ctx open Admin`
+- `Hyper+A`: `niri-ctx open current docs`
+- `Hyper+G`: `niri-ctx open current editor`
+- `Hyper+C`: `niri-ctx open current term`
+- `Hyper+R`: `niri-ctx open current agents`
+- `Hyper+T`: `niri-ctx spotify`
+- `Hyper+F`: `niri-ctx frontend`
+- `Hyper+Escape`: `niri-ctx top-ambient`
+- `Hyper+V`: `niri-ctx comms`
+- `Hyper+D`: `niri-ctx devtools-here`
+- `Hyper+Left` / `Hyper+H`: focus previous card.
+- `Hyper+Right` / `Hyper+L`: focus next card.
+- `Hyper+Up` / `Hyper+K`: focus workspace above.
+- `Hyper+Down` / `Hyper+J`: focus workspace below.
+- `Hyper+[` / `Hyper+]`: focus monitor left/right.
+- `Hyper+Page_Up` / `Hyper+Page_Down`: focus monitor up/down.
 
-## Project sessions
+Layout controls that remain on `Mod`:
 
-`niri-open-context` opens each project workspace as a full-width card carousel in this order:
+- `Mod+Ctrl+R`: cycle preset column widths.
+- `Mod+Ctrl+M`: maximize column.
+- `Mod+M`: maximize window to edges.
+- `Mod+Shift+M`: fullscreen window.
+- `Mod+W`: toggle tabbed column display.
 
-1. Helium search/docs browser
-2. Ghostty editor terminal, attached to `<context>-dev`
-3. Ghostty agent terminal, running Herdr if installed or `<context>-agents` tmux
-4. Helium output/app browser
-5. Ghostty logs/tests terminal, attached to `<context>-logs`
+## Card Order
 
-It creates or attaches one tmux dev session and one agent session per context:
+`niri-ctx open <context>` guarantees the project card order after it has created or found the required windows:
 
-The number hotkeys run `niri-open-context <context>`, so they focus existing cards and create missing cards for that context. `Hyper+C` uses `<context>-terminal`; old `<context>-shell` sessions are not used for new normal terminal cards.
+1. Docs browser
+2. Editor terminal
+3. Agents terminal
+4. Output browser
+5. Logs terminal
 
-- `UP-dev`, `UP-agents`, `UP-logs`, `UP-terminal`
-- `Webroot-dev`, `Webroot-agents`, `Webroot-logs`, `Webroot-terminal`
-- `Sealant-dev`, `Sealant-agents`, `Sealant-logs`, `Sealant-terminal`
-- `Side-dev`, `Side-agents`, `Side-logs`, `Side-terminal`
+`Admin` is smaller and opens docs plus a normal terminal. The dispatcher orders columns by window id after all target cards exist; it does not rely on spawn timing. Focus ends on the project workspace on `DP-1`, with the docs browser focused for full context opens.
 
-The editor terminal creates `<context>-dev` if missing with `nvim` as the first command, then attaches. Agent, logs, and normal terminal cards create their tmux sessions if missing, then attach.
+## Window Placement
 
-Context terminals use Ghostty by default. The launcher starts direct Ghostty processes with `--gtk-single-instance=false`, `--class=dev.yiannis.niri.<context>.<role>`, and `--title=<context>-<role>` so Niri can distinguish project cards. To force another terminal for context cards, set `NIRI_CONTEXT_TERMINAL`.
+Project terminals are placed declaratively by app-id rules. The dispatcher starts terminals with app IDs like:
 
-Herdr is not installed on this system. If a `herdr` binary appears on `PATH`, the agent card will try `herdr workspace <context>`; otherwise it creates or attaches the `<context>-agents` tmux session.
+```text
+dev.yiannis.niri.up.editor
+dev.yiannis.niri.webroot.agents
+dev.yiannis.niri.sealant.logs
+dev.yiannis.niri.side.term
+dev.yiannis.niri.admin.term
+```
 
-Project directories default to `$HOME`. Override them with:
+Rules match `dev.yiannis.niri.<slug>.(editor|agents|logs|term)` and open those windows on the matching project workspace. The script then focuses the window by id.
 
-- `NIRI_UP_DIR`
-- `NIRI_WEBROOT_DIR`
-- `NIRI_SEALANT_DIR`
-- `NIRI_SIDE_DIR`
-
-## Browser profiles
-
-Helium is the browser. The launcher uses `/opt/helium-browser-bin/helium` with Chromium profile directories discovered from `~/.config/net.imput.helium/Local State`:
-
-- `UP`: `--profile-directory="Profile 1"`
-- `Webroot`: `--profile-directory="Profile 3"`
-- `Admin`: `--profile-directory="Default"`
-- `Sealant`: uses the `Admin`/`Default` profile
-- `Side`: uses the `Admin`/`Default` profile
-
-The launcher stores the last observed Helium window IDs per context and browser role:
-
-- `~/.cache/niri-browser-<context>-docs-window-id`
-- `~/.cache/niri-browser-<context>-output-window-id`
-
-Repeated context opens refocus those existing browser cards where possible. `Hyper+A` targets the search/docs browser card.
-
-## Comms
-
-Verified comms app IDs from `niri msg --json windows`:
+Comms apps are matched by anchored app IDs:
 
 - Slack: `slack`
 - Discord: `discord`
 - Telegram: `org.telegram.desktop`
 
-Use `Mod+Shift+C` or run:
+Spotify is matched as `Spotify` and opens on `top-ambient`.
+
+## Dispatcher Commands
+
+Supported `niri-ctx` commands:
 
 ```sh
-niri-layout-comms
+niri-ctx open <UP|Webroot|Sealant|Side|Admin|current> [all|docs|output|editor|agents|logs|term]
+niri-ctx comms
+niri-ctx frontend [ctx]
+niri-ctx devtools-here
+niri-ctx top-ambient
+niri-ctx spotify
+niri-ctx watch
+niri-ctx startup
+niri-ctx doctor
+niri-ctx --tmux-role <ctx> <role>
 ```
 
-The script opens Slack, Telegram, and Discord if missing, moves them to `comms` on `HDMI-A-1`, then tries to stack them in one column.
+`current` is inferred from the focused project workspace, with the active main-output project workspace as fallback.
 
-## Frontend mode
+## contexts.conf
+
+`.config/niri/contexts.conf` is the source of truth for project directories, browser profiles, outputs, terminal choice, agent backend, and top-display follow behavior.
+
+Expected context directory map:
+
+```bash
+declare -A CTX_DIR=(
+  [UP]="$HOME/Developer/Work/UP"
+  [Webroot]="$HOME"
+  [Sealant]="$HOME"
+  [Side]="$HOME"
+  [Admin]="$HOME"
+)
+```
+
+Browser profile map:
+
+```bash
+declare -A CTX_HELIUM_PROFILE=(
+  [UP]="Profile 1"
+  [Webroot]="Profile 3"
+  [Sealant]="Default"
+  [Side]="Default"
+  [Admin]="Default"
+)
+```
+
+Output and binary settings:
+
+```bash
+MAIN_OUTPUT="DP-1"
+TOP_OUTPUT="DP-2"
+COMMS_OUTPUT="HDMI-A-1"
+HELIUM_BIN="${HELIUM_BIN:-/opt/helium-browser-bin/helium}"
+CONTEXT_TERMINAL="${NIRI_CONTEXT_TERMINAL:-ghostty}"
+```
+
+Agent backend:
+
+```bash
+AGENTS_BACKEND="tmux"
+```
+
+`tmux` is the default. Set `AGENTS_BACKEND="herdr"` only after Herdr is configured. If Herdr fails, the agent card falls back to the tmux session.
+
+Top-display follow behavior:
+
+```bash
+TOP_FOLLOW="devtools"
+```
+
+Values:
+
+- `devtools`: focusing a project Helium window on `DP-1` switches `DP-2` to that context's DevTools workspace.
+- `ambient`: browser focus switches to DevTools, and non-browser project focus returns `DP-2` to `top-ambient`.
+- `off`: the watch daemon does not change the top display.
+
+## Browser Cards
+
+Helium cards are tracked by cache files under:
+
+```text
+${XDG_CACHE_HOME:-$HOME/.cache}/niri-ctx/
+```
+
+Each docs/output cache entry is valid only if the window still exists, is `app_id == "helium"`, and is on the target context workspace. Stale cache entries are ignored and removed.
+
+## Terminal Sessions
+
+Terminal cards attach to tmux sessions named from the context and role:
+
+- `<ctx>-dev`
+- `<ctx>-agents`
+- `<ctx>-logs`
+- `<ctx>-terminal`
+
+The editor role starts or attaches the dev session with `nvim` as the initial command. The agents role uses Herdr only when `AGENTS_BACKEND="herdr"` and `herdr` is available; otherwise it uses tmux.
+
+## Comms
 
 Run:
 
 ```sh
-niri-frontend-mode UP
+niri-ctx comms
 ```
 
-or use `Mod+F` from a project workspace.
+or press `Hyper+V`.
 
-Frontend mode:
+The dispatcher opens missing Slack, Telegram, and Discord windows, ensures they are on `comms`, orders them Slack, Telegram, Discord, and stacks them into one column when possible.
 
-1. Focuses `DP-1`.
-2. Focuses the context workspace.
-3. Opens/focuses the context Helium output/app browser.
-4. Focuses `DP-2`.
-5. Focuses `<context>-devtools`.
-6. Moves detectable detached Helium DevTools windows for that context to the top workspace.
-7. Returns keyboard focus to `DP-1`.
+## Frontend Mode
 
-If DevTools matching is unreliable, focus the DevTools window manually and press `Hyper+D`. This switches `DP-1` to the project workspace, switches `DP-2` to the matching `<context>-devtools` workspace, moves the focused DevTools window to TOP, then returns keyboard focus to `DP-1`.
+Run:
 
-Use `Mod+Shift+F` or run `niri-top-ambient` to return `TOP` to `top-ambient`.
+```sh
+niri-ctx frontend
+```
 
-## Optional smart scrolling
+or press `Hyper+F`.
 
-`niri-smart-column-left` and `niri-smart-column-right` exist but are not bound by default. They switch cards and, when the newly focused card is Helium on a project workspace, switch `TOP` to the matching DevTools workspace.
+Frontend mode opens or focuses the current context output browser, switches `DP-2` to the matching `<context>-devtools` workspace, moves matching detached Helium DevTools windows for that same context, and returns focus to the main project workspace.
 
-Set `NIRI_SMART_TOP=ambient` before running them if non-browser cards should also return `TOP` to `top-ambient`; the default is to leave `TOP` unchanged.
+If a DevTools window needs manual placement, focus it and press `Hyper+D` to run:
+
+```sh
+niri-ctx devtools-here
+```
+
+## Watch Daemon
+
+`niri-ctx watch` is managed by the user service:
+
+```text
+.config/systemd/user/niri-ctx-watch.service
+```
+
+The service starts after `graphical-session.target`, runs:
+
+```sh
+%h/.local/bin/niri-ctx watch
+```
+
+and restarts only on failure. In non-niri sessions the daemon exits successfully when `NIRI_SOCKET` is unset or unreachable.
+
+The watch daemon reads niri's event stream and keeps `DP-2` aligned with project browser focus according to `TOP_FOLLOW`. It ignores its own focus changes and does not react to windows on the top display.
+
+## Health Check
+
+Run:
+
+```sh
+niri-ctx doctor
+```
+
+The doctor checks niri config validation, `NIRI_SOCKET`, expected outputs, project directories, required binaries, optional Spotify and Herdr support, the watcher service, stale legacy browser caches, and whether keybinds reference the installed `niri-ctx` path.
+
+## Troubleshooting
+
+If a project card opens on the wrong workspace:
+
+- Run `niri msg pick-window` and verify the app ID matches `dev.yiannis.niri.<slug>.<role>` for terminal cards.
+- Run `niri validate -c ~/.config/niri/config.kdl` and fix rule parse errors.
+- Check `${XDG_CACHE_HOME:-$HOME/.cache}/niri-ctx/log` for dispatcher actions.
+
+If a browser card focuses the wrong window:
+
+- Run `niri-ctx doctor`.
+- Remove stale entries under `${XDG_CACHE_HOME:-$HOME/.cache}/niri-ctx/` only after confirming the window no longer exists.
+
+If `DP-2` does not follow browser focus:
+
+- Check `TOP_FOLLOW` in `.config/niri/contexts.conf`.
+- Check `systemctl --user status niri-ctx-watch.service`.
+- Confirm `NIRI_SOCKET` is set inside the graphical session.
+
+If agents do not start:
+
+- Keep `AGENTS_BACKEND="tmux"` until Herdr is configured.
+- If using Herdr, confirm `command -v herdr` succeeds and `niri-ctx doctor` does not report a backend mismatch.

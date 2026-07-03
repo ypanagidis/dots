@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+MAIN_OUTPUT="DP-1"
+TOP_OUTPUT="DP-2"
+
+normalize_context() {
+    local raw="${1:-}" lower
+    lower="$(printf '%s\n' "$raw" | tr '[:upper:]' '[:lower:]')"
+    case "$lower" in
+        up|job1) printf 'UP\n' ;;
+        webroot|job2) printf 'Webroot\n' ;;
+        sealant|side1) printf 'Sealant\n' ;;
+        side|side2) printf 'Side\n' ;;
+        *) return 1 ;;
+    esac
+}
+
+current_context() {
+    niri msg --json workspaces | jq -r '
+        .[] | select(.is_focused) | .name // empty
+    ' | sed -E 's/-devtools$//' | while read -r ws; do
+        normalize_context "$ws" && exit 0
+    done
+}
+
+ctx="${1:-$(current_context || printf UP)}"
+if ! ctx="$(normalize_context "$ctx")"; then
+    printf 'usage: niri-frontend-mode [UP|Webroot|Sealant|Side]\n' >&2
+    exit 2
+fi
+
+devtools_ws="${ctx}-devtools"
+
+/home/yiannis/.local/bin/niri-open-context "$ctx" output
+
+niri msg action focus-monitor "$TOP_OUTPUT" >/dev/null
+niri msg action focus-workspace "$devtools_ws" >/dev/null
+
+niri msg --json windows \
+    | jq -r '
+        .[]
+        | select(.app_id == "helium")
+        | select((.title // "") | test("DevTools|Developer Tools"; "i"))
+        | .id
+    ' \
+    | while read -r id; do
+        [[ -n "$id" ]] || continue
+        niri msg action move-window-to-workspace --window-id "$id" --focus false "$devtools_ws" >/dev/null || true
+        niri msg action move-window-to-monitor --id "$id" "$TOP_OUTPUT" >/dev/null || true
+    done
+
+niri msg action focus-monitor "$MAIN_OUTPUT" >/dev/null
+niri msg action focus-workspace "$ctx" >/dev/null
+/home/yiannis/.local/bin/niri-open-context "$ctx" output

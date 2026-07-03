@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+niri msg action focus-monitor "DP-2" >/dev/null
+niri msg action focus-workspace "top-ambient" >/dev/null
+niri msg action focus-monitor "DP-1" >/dev/null

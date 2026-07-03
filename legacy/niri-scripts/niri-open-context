@@ -1,0 +1,386 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+MAIN_OUTPUT="DP-1"
+TOP_OUTPUT="DP-2"
+APP_PREFIX="dev.yiannis.niri"
+HELIUM_BIN="${HELIUM_BIN:-/opt/helium-browser-bin/helium}"
+CONTEXT_TERMINAL="${NIRI_CONTEXT_TERMINAL:-ghostty}"
+LOG_FILE="${XDG_CACHE_HOME:-$HOME/.cache}/niri-open-context.log"
+
+targets_re='^(all|editor|agents|browser|browser-docs|docs|browser-output|output|logs|shell|terminal|term)$'
+
+niri_action() {
+    niri msg action "$@" >/dev/null
+}
+
+log_invocation() {
+    mkdir -p "$(dirname "$LOG_FILE")"
+    printf '%s pid=%s args=%q' "$(date '+%F %T')" "$$" "$0" >> "$LOG_FILE"
+    for arg in "$@"; do
+        printf ' %q' "$arg" >> "$LOG_FILE"
+    done
+    printf '\n' >> "$LOG_FILE"
+}
+
+spawn_detached() {
+    (
+        exec 9>&- 2>/dev/null || true
+        setsid -f "$@" >/dev/null 2>&1
+    )
+}
+
+acquire_launcher_lock() {
+    local ctx="$1" target="$2" lock_dir lock_file
+    command -v flock >/dev/null 2>&1 || return 0
+    lock_dir="${XDG_RUNTIME_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}}/niri-open-context"
+    mkdir -p "$lock_dir"
+    lock_file="$lock_dir/$(context_slug "$ctx")-${target}.lock"
+    exec 9>"$lock_file"
+    if ! flock -n 9; then
+        focus_context "$ctx"
+        exit 0
+    fi
+}
+
+current_workspace() {
+    niri msg --json workspaces | jq -r '.[] | select(.is_focused) | .name // empty' | head -n 1
+}
+
+active_workspace_on_main() {
+    niri msg --json workspaces \
+        | jq -r --arg output "$MAIN_OUTPUT" '.[] | select(.output == $output and .is_active) | .name // empty' \
+        | head -n 1
+}
+
+normalize_context() {
+    local raw="${1:-}" lower
+    lower="$(printf '%s\n' "$raw" | tr '[:upper:]' '[:lower:]')"
+    case "$lower" in
+        up|job1) printf 'UP\n' ;;
+        webroot|job2) printf 'Webroot\n' ;;
+        sealant|side1) printf 'Sealant\n' ;;
+        side|side2) printf 'Side\n' ;;
+        admin) printf 'Admin\n' ;;
+        *) return 1 ;;
+    esac
+}
+
+context_slug() {
+    case "$1" in
+        UP) printf 'up\n' ;;
+        Webroot) printf 'webroot\n' ;;
+        Sealant) printf 'sealant\n' ;;
+        Side) printf 'side\n' ;;
+        Admin) printf 'admin\n' ;;
+        *) return 1 ;;
+    esac
+}
+
+context_from_workspace() {
+    local ws="${1:-}"
+    ws="${ws%-devtools}"
+    if normalize_context "$ws"; then
+        return 0
+    fi
+    case "$ws" in
+        job1) printf 'UP\n' ;;
+        job2) printf 'Webroot\n' ;;
+        side1) printf 'Sealant\n' ;;
+        side2) printf 'Side\n' ;;
+        *) return 1 ;;
+    esac
+}
+
+current_context() {
+    local ws main_ws
+    ws="$(current_workspace)"
+    if context_from_workspace "$ws"; then
+        return 0
+    fi
+
+    main_ws="$(active_workspace_on_main)"
+    if context_from_workspace "$main_ws"; then
+        return 0
+    fi
+
+    printf 'could not infer project context from focused workspace "%s" or main workspace "%s"\n' "${ws:-unnamed}" "${main_ws:-unnamed}" >&2
+    return 1
+}
+
+project_dir() {
+    local ctx="$1" slug var
+    slug="$(context_slug "$ctx")"
+    var="NIRI_${slug^^}_DIR"
+    printf '%s\n' "${!var:-$HOME}"
+}
+
+terminal_app_id() {
+    printf '%s.%s.%s\n' "$APP_PREFIX" "$(context_slug "$1")" "$2"
+}
+
+terminal_title() {
+    printf '%s-%s\n' "$1" "$2"
+}
+
+terminal_window_id() {
+    local ctx="$1" role="$2" app_id title
+    app_id="$(terminal_app_id "$ctx" "$role")"
+    title="$(terminal_title "$ctx" "$role")"
+    niri msg --json windows \
+        | jq -r --arg app_id "$app_id" --arg title "$title" \
+            '.[] | select(.app_id == $app_id or .title == $title) | .id' \
+        | head -n 1
+}
+
+focus_context() {
+    local ctx="$1"
+    niri_action focus-monitor "$MAIN_OUTPUT"
+    niri_action focus-workspace "$ctx"
+}
+
+focus_window_on_context() {
+    local id="$1" ctx="$2"
+    niri_action move-window-to-workspace --window-id "$id" --focus false "$ctx" || true
+    niri_action focus-window --id "$id" || true
+}
+
+wait_for_terminal_window() {
+    local ctx="$1" role="$2" id
+    for _ in {1..80}; do
+        id="$(terminal_window_id "$ctx" "$role")"
+        if [[ -n "$id" ]]; then
+            printf '%s\n' "$id"
+            return 0
+        fi
+        sleep 0.1
+    done
+    return 1
+}
+
+run_tmux_role() {
+    local ctx="$1" role="$2" dir session
+    unset TMUX TMUX_PANE
+    dir="$(project_dir "$ctx")"
+    cd "$dir" 2>/dev/null || cd "$HOME"
+    printf '\033]0;%s\007' "$(terminal_title "$ctx" "$role")"
+
+    case "$role" in
+        editor)
+            session="${ctx}-dev"
+            if ! tmux has-session -t "$session" 2>/dev/null; then
+                tmux new-session -d -s "$session" -c "$PWD" -n nvim "nvim"
+            fi
+            exec tmux attach-session -t "$session"
+            ;;
+        agents)
+            session="${ctx}-agents"
+            if command -v herdr >/dev/null 2>&1; then
+                exec herdr workspace "$ctx"
+            fi
+            if ! tmux has-session -t "$session" 2>/dev/null; then
+                tmux new-session -d -s "$session" -c "$PWD"
+            fi
+            exec tmux attach-session -t "$session"
+            ;;
+        logs)
+            session="${ctx}-logs"
+            if ! tmux has-session -t "$session" 2>/dev/null; then
+                tmux new-session -d -s "$session" -c "$PWD"
+            fi
+            exec tmux attach-session -t "$session"
+            ;;
+        shell|terminal|term)
+            session="${ctx}-terminal"
+            if ! tmux has-session -t "$session" 2>/dev/null; then
+                tmux new-session -d -s "$session" -c "$PWD"
+            fi
+            exec tmux attach-session -t "$session"
+            ;;
+    esac
+}
+
+launch_terminal_role() {
+    local ctx="$1" role="$2" app_id title
+    app_id="$(terminal_app_id "$ctx" "$role")"
+    title="$(terminal_title "$ctx" "$role")"
+    case "$CONTEXT_TERMINAL" in
+        alacritty)
+            spawn_detached alacritty --hold --class "$app_id,$app_id" --title "$title" -e "$0" --tmux-role "$ctx" "$role"
+            ;;
+        ghostty)
+            spawn_detached ghostty --gtk-single-instance=false --class="$app_id" --title="$title" -e "$0" --tmux-role "$ctx" "$role"
+            ;;
+        *)
+            spawn_detached "$CONTEXT_TERMINAL" -e "$0" --tmux-role "$ctx" "$role"
+            ;;
+    esac
+}
+
+focus_or_launch_terminal() {
+    local ctx="$1" role="$2" id
+    id="$(terminal_window_id "$ctx" "$role")"
+    if [[ -n "$id" ]]; then
+        focus_window_on_context "$id" "$ctx"
+        return 0
+    fi
+
+    focus_context "$ctx"
+    launch_terminal_role "$ctx" "$role"
+    id="$(wait_for_terminal_window "$ctx" "$role" || true)"
+    if [[ -n "$id" ]]; then
+        focus_window_on_context "$id" "$ctx"
+    fi
+}
+
+helium_profile_directory() {
+    case "$1" in
+        UP) printf 'Profile 1\n' ;;
+        Webroot) printf 'Profile 3\n' ;;
+        Sealant|Side|Admin) printf 'Default\n' ;;
+        *) return 1 ;;
+    esac
+}
+
+browser_role() {
+    case "${1:-docs}" in
+        browser|browser-docs|docs) printf 'docs\n' ;;
+        browser-output|output) printf 'output\n' ;;
+        *) return 1 ;;
+    esac
+}
+
+browser_state_file() {
+    local ctx="$1" role="$2"
+    printf '%s/.cache/niri-browser-%s-%s-window-id\n' "$HOME" "$(context_slug "$ctx")" "$role"
+}
+
+browser_window_id() {
+    local ctx="$1" role="$2" state id
+    state="$(browser_state_file "$ctx" "$role")"
+    [[ -f "$state" ]] || return 0
+    id="$(cat "$state" 2>/dev/null || true)"
+    [[ -n "$id" ]] || return 0
+    niri msg --json windows | jq -r --argjson id "$id" '.[] | select(.id == $id and .app_id == "helium") | .id' | head -n 1
+}
+
+any_helium_window_id() {
+    niri msg --json windows | jq -r '.[] | select(.app_id == "helium") | .id' | tail -n 1
+}
+
+launch_browser() {
+    local ctx="$1" role="$2" profile_dir url
+    profile_dir="$(helium_profile_directory "$ctx")"
+    case "$role" in
+        docs) url="about:blank" ;;
+        output) url="about:blank" ;;
+        *) return 1 ;;
+    esac
+    spawn_detached "$HELIUM_BIN" \
+        --profile-directory="$profile_dir" \
+        --new-window "$url"
+}
+
+wait_for_browser_window() {
+    local before_ids="${1:-}" id
+    for _ in {1..50}; do
+        id="$(niri msg --json windows | jq -r --arg before "$before_ids" '
+            ($before | split(",") | map(select(length > 0) | tonumber)) as $before_ids
+            | [.[] | select(.app_id == "helium") as $w | select(($before_ids | index($w.id)) | not) | $w.id] | last // empty
+        ')"
+        if [[ -n "$id" ]]; then
+            printf '%s\n' "$id"
+            return 0
+        fi
+        sleep 0.1
+    done
+    return 1
+}
+
+focus_or_launch_browser() {
+    local ctx="$1" requested_role="${2:-docs}" role id before_ids state
+    role="$(browser_role "$requested_role")"
+    id="$(browser_window_id "$ctx" "$role")"
+    if [[ -n "$id" ]]; then
+        focus_window_on_context "$id" "$ctx"
+        return 0
+    fi
+
+    focus_context "$ctx"
+    before_ids="$(niri msg --json windows | jq -r '[.[] | select(.app_id == "helium") | .id] | join(",")')"
+    launch_browser "$ctx" "$role"
+    id="$(wait_for_browser_window "$before_ids" || true)"
+    if [[ -z "$id" ]]; then
+        id="$(any_helium_window_id)"
+    fi
+    if [[ -n "$id" ]]; then
+        state="$(browser_state_file "$ctx" "$role")"
+        mkdir -p "$(dirname "$state")"
+        printf '%s\n' "$id" > "$state"
+        focus_window_on_context "$id" "$ctx"
+    fi
+}
+
+open_all() {
+    local ctx="$1"
+    if [[ "$ctx" == "Admin" ]]; then
+        focus_context "$ctx"
+        focus_or_launch_browser "$ctx" docs
+        focus_or_launch_terminal "$ctx" term
+        return 0
+    fi
+
+    focus_context "$ctx"
+    focus_or_launch_browser "$ctx" docs
+    focus_or_launch_terminal "$ctx" editor
+    focus_or_launch_terminal "$ctx" agents
+    focus_or_launch_browser "$ctx" output
+    focus_or_launch_terminal "$ctx" logs
+    focus_or_launch_browser "$ctx" docs
+}
+
+log_invocation "$@"
+
+if [[ "${1:-}" == "--tmux-role" ]]; then
+    run_tmux_role "$2" "$3"
+fi
+
+ctx="${1:-current}"
+target="${2:-all}"
+
+if [[ "$ctx" =~ $targets_re ]]; then
+    target="$ctx"
+    ctx="current"
+fi
+
+if [[ "$ctx" == "current" ]]; then
+    ctx="$(current_context)"
+else
+    if ! ctx="$(normalize_context "$ctx")"; then
+        printf 'usage: niri-open-context [UP|Webroot|Sealant|Side|Admin|current] [all|editor|agents|browser|browser-docs|docs|browser-output|output|logs|shell|terminal|term]\n' >&2
+        exit 2
+    fi
+fi
+
+if ! [[ "$target" =~ $targets_re ]]; then
+    printf 'unknown target: %s\n' "$target" >&2
+    exit 2
+fi
+
+acquire_launcher_lock "$ctx" "$target"
+
+case "$target" in
+    all) open_all "$ctx" ;;
+    browser|browser-docs|docs) focus_or_launch_browser "$ctx" docs ;;
+    browser-output|output) focus_or_launch_browser "$ctx" output ;;
+    editor|agents|logs)
+        focus_context "$ctx"
+        focus_or_launch_terminal "$ctx" "$target"
+        ;;
+    shell|terminal|term)
+        focus_context "$ctx"
+        focus_or_launch_terminal "$ctx" term
+        ;;
+esac
+
+niri_action focus-monitor "$MAIN_OUTPUT"

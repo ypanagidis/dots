@@ -1,0 +1,1115 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+APP_PREFIX="dev.yiannis.niri"
+COMMS_WORKSPACE="comms"
+TOP_WORKSPACE="top-ambient"
+LOG_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/niri-ctx"
+LOG_FILE="$LOG_DIR/log"
+CACHE_DIR="$LOG_DIR"
+LOCK_FILE="${XDG_RUNTIME_DIR:-$LOG_DIR}/niri-ctx.lock"
+SCRIPT_PATH="$(readlink -f -- "${BASH_SOURCE[0]}" 2>/dev/null || printf '%s\n' "${BASH_SOURCE[0]}")"
+REPO_ROOT="$(cd -- "$(dirname -- "$SCRIPT_PATH")/.." && pwd)"
+CONFIG_FILE="$REPO_ROOT/.config/niri/contexts.conf"
+
+if [[ -r "$CONFIG_FILE" ]]; then
+    # shellcheck source=.config/niri/contexts.conf
+    source "$CONFIG_FILE"
+elif [[ -r "$HOME/.config/niri/contexts.conf" ]]; then
+    # shellcheck source=/dev/null
+    source "$HOME/.config/niri/contexts.conf"
+else
+    printf 'niri-ctx: missing contexts.conf\n' >&2
+    exit 1
+fi
+
+usage() {
+    cat >&2 <<'USAGE'
+usage:
+  niri-ctx open <UP|Webroot|Sealant|Side|Admin|current> [all|docs|output|editor|agents|logs|term]
+  niri-ctx comms
+  niri-ctx frontend [ctx]
+  niri-ctx devtools-here
+  niri-ctx top-ambient
+  niri-ctx spotify
+  niri-ctx watch
+  niri-ctx startup
+  niri-ctx doctor
+  niri-ctx --tmux-role <ctx> <role>
+USAGE
+}
+
+log_line() {
+    local tmp
+    mkdir -p "$LOG_DIR"
+    printf '%s pid=%s %s\n' "$(date '+%F %T')" "$$" "$*" >> "$LOG_FILE"
+    if [[ -f "$LOG_FILE" ]] && [[ "$(wc -l < "$LOG_FILE")" -gt 2400 ]]; then
+        tmp="$(mktemp "$LOG_DIR/log.XXXXXX")"
+        tail -n 2000 "$LOG_FILE" > "$tmp" && mv -f "$tmp" "$LOG_FILE"
+    fi
+}
+
+die() {
+    log_line "FAIL $*"
+    printf 'niri-ctx: %s\n' "$*" >&2
+    exit 1
+}
+
+niri_action() {
+    log_line "action niri msg action $*"
+    niri msg action "$@" >/dev/null
+}
+
+is_uint() {
+    [[ "${1:-}" =~ ^[0-9]+$ ]]
+}
+
+spawn_detached() {
+    (
+        exec 9>&- 2>/dev/null || true
+        setsid -f "$@" >/dev/null 2>&1
+    )
+}
+
+normalize_context() {
+    local raw="${1:-}" lower
+    lower="$(printf '%s\n' "$raw" | tr '[:upper:]' '[:lower:]')"
+    case "$lower" in
+        up|job1) printf 'UP\n' ;;
+        webroot|job2) printf 'Webroot\n' ;;
+        sealant|side1) printf 'Sealant\n' ;;
+        side|side2) printf 'Side\n' ;;
+        admin) printf 'Admin\n' ;;
+        *) return 1 ;;
+    esac
+}
+
+context_slug() {
+    case "$1" in
+        UP) printf 'up\n' ;;
+        Webroot) printf 'webroot\n' ;;
+        Sealant) printf 'sealant\n' ;;
+        Side) printf 'side\n' ;;
+        Admin) printf 'admin\n' ;;
+        *) return 1 ;;
+    esac
+}
+
+context_from_workspace() {
+    local ws="${1:-}"
+    ws="${ws%-devtools}"
+    normalize_context "$ws"
+}
+
+normalize_role() {
+    local raw="${1:-all}" lower
+    lower="$(printf '%s\n' "$raw" | tr '[:upper:]' '[:lower:]')"
+    case "$lower" in
+        all) printf 'all\n' ;;
+        browser|browser-docs|docs) printf 'docs\n' ;;
+        browser-output|output) printf 'output\n' ;;
+        editor) printf 'editor\n' ;;
+        agents) printf 'agents\n' ;;
+        logs) printf 'logs\n' ;;
+        shell|terminal|term) printf 'term\n' ;;
+        *) return 1 ;;
+    esac
+}
+
+terminal_role_name() {
+    case "$1" in
+        editor|agents|logs|term) printf '%s\n' "$1" ;;
+        *) return 1 ;;
+    esac
+}
+
+terminal_app_id() {
+    printf '%s.%s.%s\n' "$APP_PREFIX" "$(context_slug "$1")" "$(terminal_role_name "$2")"
+}
+
+terminal_title() {
+    printf '%s-%s\n' "$1" "$(terminal_role_name "$2")"
+}
+
+ctx_workspace_id_from_json() {
+    local workspaces_json="$1" workspace="$2"
+    jq -r --arg workspace "$workspace" \
+        'first(.[] | select((.name // "" | ascii_downcase) == ($workspace | ascii_downcase)) | .id) // empty' \
+        <<< "$workspaces_json"
+}
+
+ctx_focused_workspace_name_from_json() {
+    jq -r 'first(.[] | select(.is_focused) | .name // empty) // empty'
+}
+
+ctx_active_workspace_on_output_from_json() {
+    local output="$1"
+    jq -r --arg output "$output" \
+        'first(.[] | select(.output == $output and .is_active) | .name // empty) // empty'
+}
+
+current_context() {
+    local workspaces_json focused_ws main_ws ctx
+    workspaces_json="$(niri msg --json workspaces)"
+    focused_ws="$(ctx_focused_workspace_name_from_json <<< "$workspaces_json")"
+    if ctx="$(context_from_workspace "$focused_ws" 2>/dev/null)"; then
+        printf '%s\n' "$ctx"
+        return 0
+    fi
+    main_ws="$(ctx_active_workspace_on_output_from_json "$MAIN_OUTPUT" <<< "$workspaces_json")"
+    if ctx="$(context_from_workspace "$main_ws" 2>/dev/null)"; then
+        printf '%s\n' "$ctx"
+        return 0
+    fi
+    printf 'could not infer project context from focused workspace "%s" or main workspace "%s"\n' \
+        "${focused_ws:-unnamed}" "${main_ws:-unnamed}" >&2
+    return 1
+}
+
+ctx_focus_monitor() {
+    local output="$1" workspaces_json output_exists output_focused
+    workspaces_json="$(niri msg --json workspaces)"
+    output_exists="$(jq -r --arg output "$output" 'any(.[]; .output == $output)' <<< "$workspaces_json")"
+    [[ "$output_exists" == "true" ]] || return 0
+    output_focused="$(jq -r --arg output "$output" 'any(.[]; .output == $output and .is_focused)' <<< "$workspaces_json")"
+    if [[ "$output_focused" != "true" ]]; then
+        niri_action focus-monitor "$output"
+    fi
+}
+
+ctx_focus_workspace() {
+    local output="$1" workspace="$2" workspaces_json target_json target_focused target_active target_output output_focused
+    workspaces_json="$(niri msg --json workspaces)"
+    target_json="$(jq -c --arg workspace "$workspace" \
+        'first(.[] | select((.name // "" | ascii_downcase) == ($workspace | ascii_downcase))) // empty' \
+        <<< "$workspaces_json")"
+    [[ -n "$target_json" ]] || return 0
+    target_focused="$(jq -r '.is_focused' <<< "$target_json")"
+    [[ "$target_focused" != "true" ]] || return 0
+    target_active="$(jq -r '.is_active' <<< "$target_json")"
+    target_output="$(jq -r '.output // empty' <<< "$target_json")"
+    output_focused="$(jq -r --arg output "$output" 'any(.[]; .output == $output and .is_focused)' <<< "$workspaces_json")"
+    if [[ "$output_focused" != "true" ]]; then
+        niri_action focus-monitor "$output"
+    fi
+    if [[ "$target_active" != "true" || "$target_output" != "$output" ]]; then
+        niri_action focus-workspace "$workspace"
+    fi
+}
+
+window_id_by_app_id() {
+    local app_id="$1"
+    niri msg --json windows \
+        | jq -r --arg app_id "$app_id" 'first(.[] | select(.app_id == $app_id) | .id) // empty'
+}
+
+terminal_window_id() {
+    local ctx="$1" role="$2" app_id
+    app_id="$(terminal_app_id "$ctx" "$role")"
+    window_id_by_app_id "$app_id"
+}
+
+browser_cache_file() {
+    local ctx="$1" role="$2"
+    printf '%s/browser-%s-%s.id\n' "$CACHE_DIR" "$(context_slug "$ctx")" "$role"
+}
+
+helium_command() {
+    local found
+    if [[ -x "$HELIUM_BIN" ]]; then
+        printf '%s\n' "$HELIUM_BIN"
+        return 0
+    fi
+    if found="$(command -v helium 2>/dev/null)"; then
+        printf '%s\n' "$found"
+        return 0
+    fi
+    return 1
+}
+
+ctx_wait_window() {
+    local jq_filter="$1" timeout_seconds="$2" start now elapsed remaining line found es_fd es_pid status=1
+    exec {es_fd}< <(niri msg --json event-stream)
+    es_pid=$!
+    start="$(date +%s)"
+    while true; do
+        now="$(date +%s)"
+        elapsed=$((now - start))
+        remaining=$((timeout_seconds - elapsed))
+        ((remaining > 0)) || break
+        if ! IFS= read -r -t "$remaining" -u "$es_fd" line; then
+            break
+        fi
+        found="$(jq -r "$jq_filter" <<< "$line" 2>/dev/null || true)"
+        if [[ -n "$found" && "$found" != "null" ]]; then
+            printf '%s\n' "$found"
+            status=0
+            break
+        fi
+    done
+    exec {es_fd}<&-
+    [[ -n "${es_pid:-}" ]] && kill "$es_pid" 2>/dev/null || true
+    return "$status"
+}
+
+wait_for_app_id() {
+    local app_id="$1" timeout_seconds="${2:-10}" filter
+    export NIRI_CTX_WAIT_APP_ID="$app_id"
+    filter='first((.WindowsChanged.windows[]?, .WindowOpenedOrChanged.window?) | select(.app_id == env.NIRI_CTX_WAIT_APP_ID) | .id) // empty'
+    ctx_wait_window "$filter" "$timeout_seconds"
+}
+
+wait_for_new_helium() {
+    local before_ids="$1" timeout_seconds="${2:-10}" filter
+    export NIRI_CTX_BEFORE_IDS="$before_ids"
+    filter='first((.WindowsChanged.windows[]?, .WindowOpenedOrChanged.window?) | select(.app_id == "helium") | select(((env.NIRI_CTX_BEFORE_IDS | split(",") | map(select(length > 0))) | index(.id | tostring)) | not) | .id) // empty'
+    ctx_wait_window "$filter" "$timeout_seconds"
+}
+
+valid_browser_cache_id() {
+    local ctx="$1" role="$2" cache_file id workspaces_json windows_json workspace_id found_id
+    cache_file="$(browser_cache_file "$ctx" "$role")"
+    [[ -f "$cache_file" ]] || return 1
+    id="$(< "$cache_file")"
+    if ! is_uint "$id"; then
+        rm -f "$cache_file"
+        return 1
+    fi
+    workspaces_json="$(niri msg --json workspaces)"
+    workspace_id="$(ctx_workspace_id_from_json "$workspaces_json" "$ctx")"
+    if ! is_uint "$workspace_id"; then
+        rm -f "$cache_file"
+        return 1
+    fi
+    windows_json="$(niri msg --json windows)"
+    found_id="$(jq -r --argjson id "$id" --argjson workspace_id "$workspace_id" \
+        'first(.[] | select(.id == $id and .app_id == "helium" and .workspace_id == $workspace_id) | .id) // empty' \
+        <<< "$windows_json")"
+    if [[ "$found_id" == "$id" ]]; then
+        printf '%s\n' "$id"
+        return 0
+    fi
+    rm -f "$cache_file"
+    return 1
+}
+
+atomic_cache_write() {
+    local file="$1" value="$2" tmp
+    mkdir -p "$(dirname -- "$file")"
+    tmp="$(mktemp "$(dirname -- "$file")/.tmp.XXXXXX")"
+    printf '%s\n' "$value" > "$tmp"
+    mv -f "$tmp" "$file"
+}
+
+focus_window_id() {
+    local id="$1"
+    is_uint "$id" || return 1
+    niri_action focus-window --id "$id" || true
+}
+
+launch_terminal_role() {
+    local ctx="$1" role="$2" app_id title
+    app_id="$(terminal_app_id "$ctx" "$role")"
+    title="$(terminal_title "$ctx" "$role")"
+    case "$CONTEXT_TERMINAL" in
+        ghostty)
+            if ! command -v ghostty >/dev/null 2>&1; then
+                die "ghostty is not installed"
+            fi
+            spawn_detached ghostty --gtk-single-instance=false --class="$app_id" --title="$title" -e "$SCRIPT_PATH" --tmux-role "$ctx" "$role"
+            ;;
+        alacritty)
+            if ! command -v alacritty >/dev/null 2>&1; then
+                die "alacritty is not installed"
+            fi
+            spawn_detached alacritty --class "$app_id,$app_id" --title "$title" -e "$SCRIPT_PATH" --tmux-role "$ctx" "$role"
+            ;;
+        *)
+            die "unsupported NIRI_CONTEXT_TERMINAL=$CONTEXT_TERMINAL; use ghostty or alacritty so app-id can be detected"
+            ;;
+    esac
+}
+
+focus_or_launch_terminal() {
+    local ctx="$1" role="$2" id app_id ctx_ws_id cur_ws_id
+    role="$(terminal_role_name "$role")"
+    id="$(terminal_window_id "$ctx" "$role")"
+    if [[ -n "$id" ]]; then
+        # Re-home a card that was moved off its context workspace.
+        ctx_ws_id="$(ctx_workspace_id_from_json "$(niri msg --json workspaces)" "$ctx")"
+        cur_ws_id="$(window_workspace_id_for_id "$id" || true)"
+        if is_uint "$ctx_ws_id" && [[ "$cur_ws_id" != "$ctx_ws_id" ]]; then
+            niri_action move-window-to-workspace --window-id "$id" --focus false "$ctx" || true
+        fi
+        ctx_focus_workspace "$MAIN_OUTPUT" "$ctx"
+        focus_window_id "$id"
+        printf '%s\n' "$id"
+        return 0
+    fi
+    ctx_focus_workspace "$MAIN_OUTPUT" "$ctx"
+    app_id="$(terminal_app_id "$ctx" "$role")"
+    launch_terminal_role "$ctx" "$role"
+    id="$(wait_for_app_id "$app_id" 10 || true)"
+    if [[ -n "$id" ]]; then
+        focus_window_id "$id"
+        printf '%s\n' "$id"
+        return 0
+    fi
+    log_line "timeout waiting for terminal ctx=$ctx role=$role app_id=$app_id"
+    return 1
+}
+
+focus_or_launch_browser() {
+    local ctx="$1" role="$2" id before_ids helium cache_file profile
+    case "$role" in
+        docs|output) ;;
+        *) return 1 ;;
+    esac
+    if id="$(valid_browser_cache_id "$ctx" "$role")"; then
+        ctx_focus_workspace "$MAIN_OUTPUT" "$ctx"
+        focus_window_id "$id"
+        printf '%s\n' "$id"
+        return 0
+    fi
+    if ! helium="$(helium_command)"; then
+        die "helium is not installed and HELIUM_BIN is not executable"
+    fi
+    profile="${CTX_HELIUM_PROFILE[$ctx]:-Default}"
+    before_ids="$(niri msg --json windows | jq -r '[.[] | select(.app_id == "helium") | .id | tostring] | join(",")')"
+    log_line "spawn helium ctx=$ctx role=$role profile=$profile"
+    spawn_detached "$helium" --profile-directory="$profile" --new-window about:blank
+    id="$(wait_for_new_helium "$before_ids" 10 || true)"
+    if [[ -z "$id" || ! "$id" =~ ^[0-9]+$ ]]; then
+        log_line "timeout waiting for helium ctx=$ctx role=$role"
+        return 1
+    fi
+    cache_file="$(browser_cache_file "$ctx" "$role")"
+    niri_action move-window-to-workspace --window-id "$id" --focus false "$ctx" || true
+    ctx_focus_workspace "$MAIN_OUTPUT" "$ctx"
+    focus_window_id "$id"
+    atomic_cache_write "$cache_file" "$id"
+    printf '%s\n' "$id"
+}
+
+column_index_for_id() {
+    local id="$1"
+    is_uint "$id" || return 1
+    niri msg --json windows \
+        | jq -r --argjson id "$id" \
+            'first(.[] | select(.id == $id) | .layout.pos_in_scrolling_layout[0]) // empty'
+}
+
+window_workspace_id_for_id() {
+    local id="$1"
+    is_uint "$id" || return 1
+    niri msg --json windows \
+        | jq -r --argjson id "$id" 'first(.[] | select(.id == $id) | .workspace_id) // empty'
+}
+
+move_column_to_index_if_needed() {
+    local id="$1" expected_index="$2" ctx="$3" workspaces_json workspace_id current_ws current_col
+    is_uint "$id" || return 0
+    workspaces_json="$(niri msg --json workspaces)"
+    workspace_id="$(ctx_workspace_id_from_json "$workspaces_json" "$ctx")"
+    is_uint "$workspace_id" || return 0
+    current_ws="$(window_workspace_id_for_id "$id")"
+    [[ "$current_ws" == "$workspace_id" ]] || return 0
+    current_col="$(column_index_for_id "$id")"
+    is_uint "$current_col" || return 0
+    [[ "$current_col" == "$expected_index" ]] && return 0
+    focus_window_id "$id"
+    niri_action move-column-to-index "$expected_index" || true
+}
+
+open_all() {
+    local ctx="$1" docs_id editor_id agents_id output_id logs_id term_id
+    ctx_focus_workspace "$MAIN_OUTPUT" "$ctx"
+    # A single slow/failed card must not abort the rest of the context open.
+    docs_id="$(focus_or_launch_browser "$ctx" docs || true)"
+    if [[ "$ctx" == "Admin" ]]; then
+        term_id="$(focus_or_launch_terminal "$ctx" term || true)"
+        move_column_to_index_if_needed "$docs_id" 1 "$ctx"
+        move_column_to_index_if_needed "$term_id" 2 "$ctx"
+        ctx_focus_workspace "$MAIN_OUTPUT" "$ctx"
+        if [[ -n "$docs_id" ]]; then
+            focus_window_id "$docs_id"
+        fi
+        return 0
+    fi
+    editor_id="$(focus_or_launch_terminal "$ctx" editor || true)"
+    agents_id="$(focus_or_launch_terminal "$ctx" agents || true)"
+    output_id="$(focus_or_launch_browser "$ctx" output || true)"
+    logs_id="$(focus_or_launch_terminal "$ctx" logs || true)"
+    move_column_to_index_if_needed "$docs_id" 1 "$ctx"
+    move_column_to_index_if_needed "$editor_id" 2 "$ctx"
+    move_column_to_index_if_needed "$agents_id" 3 "$ctx"
+    move_column_to_index_if_needed "$output_id" 4 "$ctx"
+    move_column_to_index_if_needed "$logs_id" 5 "$ctx"
+    ctx_focus_workspace "$MAIN_OUTPUT" "$ctx"
+    if [[ -n "$docs_id" ]]; then
+        focus_window_id "$docs_id"
+    fi
+}
+
+open_role() {
+    local ctx="$1" role="$2"
+    case "$role" in
+        all) open_all "$ctx" ;;
+        docs|output) focus_or_launch_browser "$ctx" "$role" >/dev/null ;;
+        editor|agents|logs|term) focus_or_launch_terminal "$ctx" "$role" >/dev/null ;;
+        *) return 1 ;;
+    esac
+}
+
+tmux_attach_or_create() {
+    local session="$1" window_name="${2:-}" command="${3:-}"
+    if ! tmux has-session -t "$session" 2>/dev/null; then
+        if [[ -n "$command" ]]; then
+            tmux new-session -d -s "$session" -c "$PWD" -n "$window_name" "$command"
+        elif [[ -n "$window_name" ]]; then
+            tmux new-session -d -s "$session" -c "$PWD" -n "$window_name"
+        else
+            tmux new-session -d -s "$session" -c "$PWD"
+        fi
+    fi
+    exec tmux attach-session -t "$session"
+}
+
+run_tmux_role() {
+    local ctx="$1" role="$2" dir session
+    if ! ctx="$(normalize_context "$ctx")"; then
+        printf 'unknown context: %s\n' "$ctx" >&2
+        exit 2
+    fi
+    role="$(normalize_role "$role")"
+    case "$role" in
+        editor|agents|logs|term) ;;
+        *) printf 'unknown terminal role: %s\n' "$role" >&2; exit 2 ;;
+    esac
+    unset TMUX TMUX_PANE
+    dir="${CTX_DIR[$ctx]:-$HOME}"
+    cd "$dir" 2>/dev/null || cd "$HOME"
+    printf '\033]0;%s\007' "$(terminal_title "$ctx" "$role")"
+    case "$role" in
+        editor)
+            tmux_attach_or_create "${ctx}-dev" nvim nvim
+            ;;
+        agents)
+            session="${ctx}-agents"
+            if [[ "${AGENTS_BACKEND:-tmux}" == "herdr" ]]; then
+                if command -v herdr >/dev/null 2>&1; then
+                    if herdr --session "$ctx"; then
+                        exit 0
+                    fi
+                    log_line "herdr failed for ctx=$ctx; falling back to tmux"
+                fi
+            fi
+            tmux_attach_or_create "$session"
+            ;;
+        logs)
+            tmux_attach_or_create "${ctx}-logs"
+            ;;
+        term)
+            tmux_attach_or_create "${ctx}-terminal"
+            ;;
+    esac
+}
+
+app_id_for_comms_app() {
+    case "$1" in
+        slack) printf 'slack\n' ;;
+        telegram) printf 'org.telegram.desktop\n' ;;
+        discord) printf 'discord\n' ;;
+        *) return 1 ;;
+    esac
+}
+
+# Returns nonzero when the app is not installed (caller then skips waiting on it).
+launch_comms_app() {
+    case "$1" in
+        slack)
+            command -v slack >/dev/null 2>&1 || return 1
+            spawn_detached slack
+            ;;
+        telegram)
+            if command -v Telegram >/dev/null 2>&1; then
+                spawn_detached Telegram
+            elif command -v telegram-desktop >/dev/null 2>&1; then
+                spawn_detached telegram-desktop
+            else
+                return 1
+            fi
+            ;;
+        discord)
+            command -v discord >/dev/null 2>&1 || return 1
+            spawn_detached discord
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+window_is_floating() {
+    local id="$1" result
+    is_uint "$id" || return 0
+    # jq's // also replaces a legitimate `false`, so it can't provide the
+    # missing-window default here.
+    result="$(niri msg --json windows | jq -r --argjson id "$id" \
+        '[.[] | select(.id == $id) | .is_floating] | if length == 0 then true else first end')"
+    [[ "$result" == "true" ]]
+}
+
+right_column_first_id() {
+    local workspace_id="$1" current_col="$2"
+    is_uint "$workspace_id" && is_uint "$current_col" || return 1
+    niri msg --json windows | jq -r --argjson ws "$workspace_id" --argjson col "$current_col" '
+        [.[] | select(.workspace_id == $ws and .is_floating == false and (.layout.pos_in_scrolling_layout[0] // 0) > $col)]
+        | sort_by(.layout.pos_in_scrolling_layout[0], .layout.pos_in_scrolling_layout[1])
+        | first(.[] | .id) // empty
+    '
+}
+
+restore_comms() {
+    local app app_id id ids=() present_apps=() stacking_ids=() workspace_id col right_id first_id
+    for app in slack telegram discord; do
+        app_id="$(app_id_for_comms_app "$app")"
+        id="$(window_id_by_app_id "$app_id")"
+        if [[ -n "$id" ]]; then
+            present_apps+=("$app")
+        elif launch_comms_app "$app"; then
+            present_apps+=("$app")
+        else
+            log_line "comms app $app not installed; skipping"
+        fi
+    done
+    for app in ${present_apps[@]+"${present_apps[@]}"}; do
+        app_id="$(app_id_for_comms_app "$app")"
+        id="$(window_id_by_app_id "$app_id")"
+        if [[ -z "$id" ]]; then
+            id="$(wait_for_app_id "$app_id" 10 || true)"
+        fi
+        if [[ -n "$id" ]]; then
+            ids+=("$id")
+            niri_action move-window-to-workspace --window-id "$id" --focus false "$COMMS_WORKSPACE" || true
+        fi
+    done
+    ctx_focus_workspace "$COMMS_OUTPUT" "$COMMS_WORKSPACE"
+    ((${#ids[@]} > 0)) || return 0
+    workspace_id="$(ctx_workspace_id_from_json "$(niri msg --json workspaces)" "$COMMS_WORKSPACE")"
+    is_uint "$workspace_id" || return 0
+    for id in "${ids[@]}"; do
+        if ! window_is_floating "$id"; then
+            stacking_ids+=("$id")
+        fi
+    done
+    ((${#stacking_ids[@]} > 0)) || return 0
+    for i in "${!stacking_ids[@]}"; do
+        focus_window_id "${stacking_ids[$i]}"
+        niri_action move-column-to-index "$((i + 1))" || true
+    done
+    first_id="${stacking_ids[0]}"
+    focus_window_id "$first_id"
+    niri_action set-column-width "100%" || true
+    for id in "${stacking_ids[@]:1}"; do
+        # The layout may lag behind the moves above; re-check a few times
+        # before giving up on stacking this window.
+        for _ in 1 2 3 4; do
+            col="$(column_index_for_id "$first_id")"
+            is_uint "$col" || break
+            right_id="$(right_column_first_id "$workspace_id" "$col")"
+            if [[ "$right_id" == "$id" ]]; then
+                focus_window_id "$first_id"
+                niri_action consume-window-into-column || true
+                break
+            fi
+            sleep 0.1
+        done
+    done
+    for id in "${stacking_ids[@]}"; do
+        niri_action set-window-height --id "$id" "33%" || true
+    done
+    focus_window_id "$first_id"
+}
+
+move_project_devtools() {
+    local ctx="$1" workspaces_json windows_json ctx_ws_id devtools_ws_id ids id
+    workspaces_json="$(niri msg --json workspaces)"
+    ctx_ws_id="$(ctx_workspace_id_from_json "$workspaces_json" "$ctx")"
+    devtools_ws_id="$(ctx_workspace_id_from_json "$workspaces_json" "${ctx}-devtools")"
+    is_uint "$ctx_ws_id" || return 0
+    is_uint "$devtools_ws_id" || return 0
+    windows_json="$(niri msg --json windows)"
+    mapfile -t ids < <(jq -r --argjson ctx_ws_id "$ctx_ws_id" --argjson devtools_ws_id "$devtools_ws_id" '
+        .[]
+        | select(.app_id == "helium")
+        | select((.title // "") | test("DevTools|Developer Tools"; "i"))
+        | select(.workspace_id == $ctx_ws_id or .workspace_id == $devtools_ws_id)
+        | .id
+    ' <<< "$windows_json")
+    for id in "${ids[@]}"; do
+        is_uint "$id" || continue
+        niri_action move-window-to-workspace --window-id "$id" --focus false "${ctx}-devtools" || true
+        niri_action move-window-to-monitor --id "$id" "$TOP_OUTPUT" || true
+    done
+}
+
+frontend_mode() {
+    local ctx="${1:-}"
+    if [[ -z "$ctx" ]]; then
+        ctx="$(current_context)"
+    elif ! ctx="$(normalize_context "$ctx")"; then
+        die "usage: niri-ctx frontend [UP|Webroot|Sealant|Side|Admin|current]"
+    fi
+    if [[ "$ctx" == "Admin" ]]; then
+        # Admin has no devtools workspace; just surface the output browser.
+        focus_or_launch_browser "$ctx" output >/dev/null || true
+        return 0
+    fi
+    focus_or_launch_browser "$ctx" output >/dev/null || true
+    ctx_focus_workspace "$TOP_OUTPUT" "${ctx}-devtools"
+    move_project_devtools "$ctx"
+    ctx_focus_workspace "$MAIN_OUTPUT" "$ctx"
+}
+
+devtools_here() {
+    local windows_json workspaces_json focused_id focused_ws_id focused_ws ctx
+    windows_json="$(niri msg --json windows)"
+    focused_id="$(jq -r 'first(.[] | select(.is_focused) | .id) // empty' <<< "$windows_json")"
+    is_uint "$focused_id" || return 0
+    focused_ws_id="$(jq -r --argjson id "$focused_id" 'first(.[] | select(.id == $id) | .workspace_id) // empty' <<< "$windows_json")"
+    is_uint "$focused_ws_id" || return 0
+    workspaces_json="$(niri msg --json workspaces)"
+    focused_ws="$(jq -r --argjson ws "$focused_ws_id" 'first(.[] | select(.id == $ws) | .name // empty) // empty' <<< "$workspaces_json")"
+    if ! ctx="$(context_from_workspace "$focused_ws")"; then
+        return 0
+    fi
+    if [[ "$ctx" == "Admin" ]]; then
+        # Admin has no devtools workspace.
+        return 0
+    fi
+    niri_action move-window-to-workspace --window-id "$focused_id" --focus false "${ctx}-devtools" || true
+    niri_action move-window-to-monitor --id "$focused_id" "$TOP_OUTPUT" || true
+    ctx_focus_workspace "$TOP_OUTPUT" "${ctx}-devtools"
+    ctx_focus_workspace "$MAIN_OUTPUT" "$ctx"
+}
+
+spotify_window_id() {
+    window_id_by_app_id "Spotify"
+}
+
+launch_spotify() {
+    if command -v spotify-launcher >/dev/null 2>&1; then
+        spawn_detached spotify-launcher
+    elif command -v spotify >/dev/null 2>&1; then
+        spawn_detached spotify
+    else
+        die "spotify-launcher or spotify is not installed"
+    fi
+}
+
+focus_spotify() {
+    local id
+    id="$(spotify_window_id)"
+    if [[ -z "$id" ]]; then
+        launch_spotify
+        id="$(wait_for_app_id "Spotify" 20 || true)"
+    fi
+    [[ -n "$id" ]] || return 0
+    niri_action move-window-to-workspace --window-id "$id" --focus false "$TOP_WORKSPACE" || true
+    niri_action move-window-to-monitor --id "$id" "$TOP_OUTPUT" || true
+    ctx_focus_workspace "$TOP_OUTPUT" "$TOP_WORKSPACE"
+    focus_window_id "$id"
+}
+
+top_ambient() {
+    ctx_focus_workspace "$TOP_OUTPUT" "$TOP_WORKSPACE"
+    ctx_focus_monitor "$MAIN_OUTPUT"
+}
+
+focus_only_when_locked() {
+    local cmd="$1" ctx="${2:-}" role="${3:-}" id
+    log_line "lock busy; focus-only cmd=$cmd ctx=$ctx role=$role"
+    case "$cmd" in
+        open)
+            [[ -n "$ctx" ]] || return 0
+            ctx_focus_workspace "$MAIN_OUTPUT" "$ctx"
+            case "$role" in
+                docs|output)
+                    if id="$(valid_browser_cache_id "$ctx" "$role")"; then
+                        focus_window_id "$id"
+                    fi
+                    ;;
+                editor|agents|logs|term)
+                    id="$(terminal_window_id "$ctx" "$role")"
+                    [[ -n "$id" ]] && focus_window_id "$id"
+                    ;;
+            esac
+            ;;
+        comms)
+            ctx_focus_workspace "$COMMS_OUTPUT" "$COMMS_WORKSPACE"
+            id="$(window_id_by_app_id slack)"
+            [[ -n "$id" ]] && focus_window_id "$id"
+            ;;
+        frontend)
+            [[ -n "$ctx" ]] && ctx_focus_workspace "$TOP_OUTPUT" "${ctx}-devtools"
+            [[ -n "$ctx" ]] && ctx_focus_workspace "$MAIN_OUTPUT" "$ctx"
+            ;;
+        spotify)
+            id="$(spotify_window_id)"
+            if [[ -n "$id" ]]; then
+                ctx_focus_workspace "$TOP_OUTPUT" "$TOP_WORKSPACE"
+                focus_window_id "$id"
+            fi
+            ;;
+        devtools-here)
+            return 0
+            ;;
+    esac
+}
+
+with_global_lock() {
+    local cmd="$1" ctx="${2:-}" role="${3:-}"
+    mkdir -p "$(dirname -- "$LOCK_FILE")"
+    exec 9>"$LOCK_FILE"
+    if ! flock -n 9; then
+        focus_only_when_locked "$cmd" "$ctx" "$role"
+        exit 0
+    fi
+}
+
+active_workspace_name_on_output() {
+    local output="$1"
+    niri msg --json workspaces | ctx_active_workspace_on_output_from_json "$output"
+}
+
+# True when a dispatcher command currently holds the global lock; the watcher
+# must stay out of the way while scripted focus sequences run.
+global_lock_is_busy() {
+    local fd
+    mkdir -p "$(dirname -- "$LOCK_FILE")"
+    exec {fd}>"$LOCK_FILE" 2>/dev/null || return 1
+    if flock -n "$fd"; then
+        flock -u "$fd"
+        exec {fd}>&-
+        return 1
+    fi
+    exec {fd}>&-
+    return 0
+}
+
+watch_apply_top_follow() {
+    local target="$1" now
+    [[ -n "$target" ]] || return 0
+    if global_lock_is_busy; then
+        return 0
+    fi
+    if [[ "$(active_workspace_name_on_output "$TOP_OUTPUT")" == "$target" ]]; then
+        return 0
+    fi
+    now="$(date +%s%3N)"
+    WATCH_IGNORE_UNTIL=$((now + 700))
+    ctx_focus_workspace "$TOP_OUTPUT" "$target"
+    ctx_focus_monitor "$MAIN_OUTPUT"
+}
+
+watch_consider_focus() {
+    local focused_id="$1" now app_id ws_id ws_name ws_output ctx target=""
+    is_uint "$focused_id" || return 0
+    now="$(date +%s%3N)"
+    ((now >= WATCH_IGNORE_UNTIL)) || return 0
+    [[ "${TOP_FOLLOW:-devtools}" != "off" ]] || return 0
+    app_id="${WIN_APP[$focused_id]:-}"
+    ws_id="${WIN_WS[$focused_id]:-}"
+    [[ -n "$ws_id" ]] || return 0
+    ws_name="${WS_NAME[$ws_id]:-}"
+    ws_output="${WS_OUTPUT[$ws_id]:-}"
+    [[ "$ws_output" == "$MAIN_OUTPUT" ]] || return 0
+    ctx="$(context_from_workspace "$ws_name" 2>/dev/null)" || return 0
+    [[ "$ctx" != "Admin" ]] || return 0
+    if [[ "$app_id" == "helium" && "${TOP_FOLLOW:-devtools}" == "devtools" ]]; then
+        target="${ctx}-devtools"
+    elif [[ "$app_id" != "helium" && "${TOP_FOLLOW:-devtools}" == "ambient" ]]; then
+        target="$TOP_WORKSPACE"
+    fi
+    watch_apply_top_follow "$target"
+}
+
+watch_daemon() {
+    local backoff=1 line type now focused_id app_id ws_id ws_name ws_output target
+    if [[ -z "${NIRI_SOCKET:-}" ]]; then
+        log_line "watch exit: NIRI_SOCKET unset"
+        exit 0
+    fi
+    if ! niri msg --json workspaces >/dev/null 2>&1; then
+        log_line "watch exit: niri socket unreachable"
+        exit 0
+    fi
+    declare -A WIN_APP=()
+    declare -A WIN_WS=()
+    declare -A WS_NAME=()
+    declare -A WS_OUTPUT=()
+    WATCH_IGNORE_UNTIL=0
+    while true; do
+        while IFS= read -r line; do
+            backoff=1
+            type="$(jq -r 'keys[0] // empty' <<< "$line" 2>/dev/null || true)"
+            case "$type" in
+                WorkspacesChanged)
+                    WS_NAME=()
+                    WS_OUTPUT=()
+                    while IFS=$'\t' read -r ws_id ws_name ws_output; do
+                        [[ -n "$ws_id" ]] || continue
+                        WS_NAME[$ws_id]="$ws_name"
+                        WS_OUTPUT[$ws_id]="$ws_output"
+                    done < <(jq -r '.WorkspacesChanged.workspaces[] | [.id, (.name // ""), (.output // "")] | @tsv' <<< "$line")
+                    ;;
+                WindowsChanged)
+                    WIN_APP=()
+                    WIN_WS=()
+                    while IFS=$'\t' read -r focused_id app_id ws_id; do
+                        [[ -n "$focused_id" ]] || continue
+                        WIN_APP[$focused_id]="$app_id"
+                        WIN_WS[$focused_id]="$ws_id"
+                    done < <(jq -r '.WindowsChanged.windows[] | [.id, (.app_id // ""), (.workspace_id // "")] | @tsv' <<< "$line")
+                    ;;
+                WindowOpenedOrChanged)
+                    focused_id="$(jq -r '.WindowOpenedOrChanged.window.id // empty' <<< "$line")"
+                    if [[ -n "$focused_id" ]]; then
+                        WIN_APP[$focused_id]="$(jq -r '.WindowOpenedOrChanged.window.app_id // ""' <<< "$line")"
+                        WIN_WS[$focused_id]="$(jq -r '.WindowOpenedOrChanged.window.workspace_id // ""' <<< "$line")"
+                        # niri folds a focus change into this event when it
+                        # coincides with a title/workspace change, so a
+                        # WindowFocusChanged may never arrive for it.
+                        if [[ "$(jq -r '.WindowOpenedOrChanged.window.is_focused // false' <<< "$line")" == "true" ]]; then
+                            watch_consider_focus "$focused_id" || true
+                        fi
+                    fi
+                    ;;
+                WindowClosed)
+                    focused_id="$(jq -r '.WindowClosed.id // empty' <<< "$line")"
+                    if is_uint "$focused_id"; then
+                        unset "WIN_APP[$focused_id]" "WIN_WS[$focused_id]" 2>/dev/null || true
+                    fi
+                    ;;
+                WindowFocusChanged)
+                    focused_id="$(jq -r '.WindowFocusChanged.id // empty' <<< "$line")"
+                    watch_consider_focus "$focused_id" || true
+                    ;;
+            esac
+        done < <(niri msg --json event-stream)
+        log_line "watch event-stream ended; reconnecting in ${backoff}s"
+        sleep "$backoff"
+        ((backoff < 30)) && backoff=$((backoff * 2))
+    done
+}
+
+startup_sync() {
+    local workspaces_json has_up
+    for _ in {1..75}; do
+        workspaces_json="$(niri msg --json workspaces 2>/dev/null || true)"
+        if [[ -n "$workspaces_json" ]]; then
+            has_up="$(jq -r --arg output "$MAIN_OUTPUT" 'any(.[]; .output == $output and .name == "UP")' <<< "$workspaces_json")"
+            if [[ "$has_up" == "true" ]]; then
+                ctx_focus_workspace "$MAIN_OUTPUT" "UP"
+                return 0
+            fi
+        fi
+        sleep 0.2
+    done
+    log_line "startup timeout waiting for UP on $MAIN_OUTPUT"
+}
+
+doctor_line() {
+    local level="$1" message="$2"
+    printf '%s %s\n' "$level" "$message"
+}
+
+doctor() {
+    local failures=0 workspaces_json output stale_count keybinds niri_ctx_path unit_state helium_ok=0
+    if command -v niri >/dev/null 2>&1; then
+        if niri validate -c "$REPO_ROOT/.config/niri/config.kdl" >/dev/null 2>&1; then
+            doctor_line PASS "niri validate"
+        else
+            doctor_line FAIL "niri validate"
+            failures=$((failures + 1))
+        fi
+    else
+        doctor_line FAIL "niri binary missing"
+        failures=$((failures + 1))
+    fi
+    if [[ -n "${NIRI_SOCKET:-}" ]] && workspaces_json="$(niri msg --json workspaces 2>/dev/null)"; then
+        doctor_line PASS "NIRI_SOCKET reachable"
+    else
+        doctor_line FAIL "NIRI_SOCKET unreachable"
+        failures=$((failures + 1))
+        workspaces_json="[]"
+    fi
+    for output in "$MAIN_OUTPUT" "$TOP_OUTPUT" "$COMMS_OUTPUT"; do
+        if jq -e --arg output "$output" 'any(.[]; .output == $output)' <<< "$workspaces_json" >/dev/null; then
+            doctor_line PASS "output $output present"
+        elif [[ "$output" == "$MAIN_OUTPUT" ]]; then
+            doctor_line FAIL "output $output missing"
+            failures=$((failures + 1))
+        else
+            doctor_line WARN "output $output missing"
+        fi
+    done
+    for ctx in UP Webroot Sealant Side Admin; do
+        if [[ -d "${CTX_DIR[$ctx]:-}" ]]; then
+            doctor_line PASS "CTX_DIR[$ctx]=${CTX_DIR[$ctx]}"
+        else
+            doctor_line FAIL "CTX_DIR[$ctx]=${CTX_DIR[$ctx]:-unset} missing"
+            failures=$((failures + 1))
+        fi
+    done
+    for bin in jq tmux ghostty; do
+        if command -v "$bin" >/dev/null 2>&1; then
+            doctor_line PASS "binary $bin"
+        else
+            doctor_line FAIL "binary $bin missing"
+            failures=$((failures + 1))
+        fi
+    done
+    if [[ -x "$HELIUM_BIN" ]] || command -v helium >/dev/null 2>&1; then
+        helium_ok=1
+    fi
+    if ((helium_ok)); then
+        doctor_line PASS "helium available"
+    else
+        doctor_line FAIL "helium missing"
+        failures=$((failures + 1))
+    fi
+    if command -v spotify-launcher >/dev/null 2>&1 || command -v spotify >/dev/null 2>&1; then
+        doctor_line INFO "spotify launcher available"
+    else
+        doctor_line INFO "spotify launcher missing"
+    fi
+    if command -v herdr >/dev/null 2>&1; then
+        doctor_line INFO "herdr available"
+    elif [[ "${AGENTS_BACKEND:-tmux}" == "herdr" ]]; then
+        doctor_line FAIL "AGENTS_BACKEND=herdr but herdr missing"
+        failures=$((failures + 1))
+    else
+        doctor_line INFO "herdr missing; tmux backend configured"
+    fi
+    if command -v systemctl >/dev/null 2>&1; then
+        unit_state="$(systemctl --user is-active niri-ctx-watch 2>/dev/null || true)"
+        doctor_line INFO "systemd niri-ctx-watch active=$unit_state"
+    else
+        doctor_line INFO "systemctl missing"
+    fi
+    stale_count="$(find "$HOME/.cache" -maxdepth 1 -type f -name 'niri-browser-*' 2>/dev/null | wc -l)"
+    if [[ "$stale_count" -gt 0 ]]; then
+        doctor_line WARN "legacy browser cache files present in ~/.cache; remove niri-browser-* after migration"
+    else
+        doctor_line PASS "no legacy browser cache files"
+    fi
+    keybinds="$REPO_ROOT/.config/niri/cfg/keybinds.kdl"
+    niri_ctx_path="$HOME/.local/bin/niri-ctx"
+    if [[ -e "$niri_ctx_path" ]]; then
+        if [[ -f "$keybinds" ]] && grep -q 'niri-ctx' "$keybinds"; then
+            doctor_line PASS "keybinds reference niri-ctx"
+        elif [[ -f "$keybinds" ]]; then
+            doctor_line FAIL "keybinds do not reference niri-ctx yet"
+            failures=$((failures + 1))
+        else
+            doctor_line FAIL "keybinds file missing"
+            failures=$((failures + 1))
+        fi
+    else
+        doctor_line FAIL "$niri_ctx_path missing"
+        failures=$((failures + 1))
+    fi
+    return "$failures"
+}
+
+handle_open() {
+    local ctx="${1:-}" role="${2:-all}"
+    [[ -n "$ctx" ]] || die "open requires a context"
+    if [[ "$ctx" == "current" ]]; then
+        ctx="$(current_context)"
+    elif ! ctx="$(normalize_context "$ctx")"; then
+        die "unknown context: $ctx"
+    fi
+    if ! role="$(normalize_role "$role")"; then
+        die "unknown role: ${2:-all}"
+    fi
+    with_global_lock open "$ctx" "$role"
+    open_role "$ctx" "$role"
+}
+
+main() {
+    local subcmd="${1:-}"
+    log_line "invoke args=$(printf '%q ' "$@")"
+    case "$subcmd" in
+        --tmux-role)
+            shift
+            [[ $# -eq 2 ]] || die "--tmux-role requires <ctx> <role>"
+            run_tmux_role "$1" "$2"
+            ;;
+        open)
+            shift
+            handle_open "$@"
+            ;;
+        comms)
+            shift
+            [[ $# -eq 0 ]] || die "comms takes no arguments"
+            with_global_lock comms
+            restore_comms
+            ;;
+        frontend)
+            shift
+            local ctx_arg="${1:-}"
+            if [[ -z "$ctx_arg" || "$ctx_arg" == "current" ]]; then
+                ctx_arg="$(current_context)"
+            elif ! ctx_arg="$(normalize_context "$ctx_arg")"; then
+                die "usage: niri-ctx frontend [UP|Webroot|Sealant|Side|Admin|current]"
+            fi
+            with_global_lock frontend "$ctx_arg"
+            frontend_mode "$ctx_arg"
+            ;;
+        devtools-here)
+            shift
+            [[ $# -eq 0 ]] || die "devtools-here takes no arguments"
+            with_global_lock devtools-here
+            devtools_here
+            ;;
+        top-ambient)
+            shift
+            [[ $# -eq 0 ]] || die "top-ambient takes no arguments"
+            top_ambient
+            ;;
+        spotify)
+            shift
+            [[ $# -eq 0 ]] || die "spotify takes no arguments"
+            with_global_lock spotify
+            focus_spotify
+            ;;
+        watch)
+            shift
+            [[ $# -eq 0 ]] || die "watch takes no arguments"
+            watch_daemon
+            ;;
+        startup)
+            shift
+            [[ $# -eq 0 ]] || die "startup takes no arguments"
+            startup_sync
+            ;;
+        doctor)
+            shift
+            [[ $# -eq 0 ]] || die "doctor takes no arguments"
+            doctor
+            ;;
+        -h|--help|'')
+            usage
+            [[ -n "$subcmd" ]]
+            ;;
+        *)
+            usage
+            exit 2
+            ;;
+    esac
+}
+
+main "$@"
