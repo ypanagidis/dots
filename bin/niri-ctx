@@ -364,6 +364,11 @@ focus_or_launch_terminal() {
         fi
         break
     done
+    # The final attempt also timed out: reap its windowless ghostty too, or
+    # they accumulate as zombie GTK loops that poison later spawns.
+    if [[ "$CONTEXT_TERMINAL" == "ghostty" ]]; then
+        pkill -f -- "--class=${app_id//./\\.}" 2>/dev/null || true
+    fi
     log_line "timeout waiting for terminal ctx=$ctx role=$role app_id=$app_id"
     return 1
 }
