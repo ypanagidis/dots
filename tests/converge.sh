@@ -30,21 +30,18 @@ check() { # check <desc> <actual> <expected>
     fi
 }
 
-up_cards() { # prints "docs editor agents output logs" window ids for UP
-    local docs editor agents output logs
+up_cards() { # prints "docs work" window ids for UP
+    local docs work
     docs="$(head -1 ~/.cache/niri-ctx/browser-up-docs.id 2>/dev/null || true)"
-    output="$(head -1 ~/.cache/niri-ctx/browser-up-output.id 2>/dev/null || true)"
-    editor="$(card_id dev.yiannis.niri.up.editor)"
-    agents="$(card_id dev.yiannis.niri.up.agents)"
-    logs="$(card_id dev.yiannis.niri.up.logs)"
-    printf '%s %s %s %s %s\n' "${docs:-?}" "${editor:-?}" "${agents:-?}" "${output:-?}" "${logs:-?}"
+    work="$(card_id dev.yiannis.niri.up.work)"
+    printf '%s %s\n' "${docs:-?}" "${work:-?}"
 }
 
 assert_up_canonical() { # <label>
-    local label="$1" ws docs editor agents output logs
+    local label="$1" ws docs work
     ws="$(ws_id UP)"
-    read -r docs editor agents output logs <<< "$(up_cards)"
-    for pair in "docs:$docs:1" "editor:$editor:2" "agents:$agents:3" "output:$output:4" "logs:$logs:5"; do
+    read -r docs work <<< "$(up_cards)"
+    for pair in "docs:$docs:1" "work:$work:2"; do
         IFS=: read -r name id col <<< "$pair"
         if [[ "$id" == "?" ]]; then
             FAIL=$((FAIL+1)); say "FAIL $label/$name card missing"
@@ -53,6 +50,13 @@ assert_up_canonical() { # <label>
         check "$label/$name on UP ws" "$(win_ws "$id")" "$ws"
         check "$label/$name at column $col" "$(win_col "$id")" "$col"
     done
+}
+
+up_work_focused_role() { # herdr workspace label currently focused in UP-work
+    local sock="$HOME/.config/herdr/sessions/UP-work/herdr.sock"
+    [[ -S "$sock" ]] || { printf 'no-sock\n'; return; }
+    timeout 2 env HERDR_SOCKET_PATH="$sock" herdr workspace list 2>/dev/null \
+        | jq -r 'first(.result.workspaces[]? | select(.focused) | .label) // "none"'
 }
 
 say "=== S1: open UP twice is idempotent and canonical ==="
@@ -64,23 +68,29 @@ check "S1 window count stable" "$c2" "$c1"
 assert_up_canonical S1
 
 say "=== S2: cards scattered to other workspaces converge back ==="
-read -r docs editor agents output logs <<< "$(up_cards)"
+read -r docs work <<< "$(up_cards)"
 niri msg action move-window-to-workspace --window-id "$docs" --focus false Webroot >/dev/null
-niri msg action move-window-to-workspace --window-id "$editor" --focus false Side >/dev/null
+niri msg action move-window-to-workspace --window-id "$work" --focus false Side >/dev/null
 sleep 1
 "$NIRI_CTX" open UP; sleep 2
 check "S2 window count stable" "$(window_count)" "$c1"
 assert_up_canonical S2
 
 say "=== S3: cards stacked into one column converge back ==="
-read -r docs editor agents output logs <<< "$(up_cards)"
-# stack editor onto agents' column by consuming
-niri msg action focus-window --id "$editor" >/dev/null
+read -r docs work <<< "$(up_cards)"
+# stack work onto docs' column by consuming
+niri msg action focus-window --id "$work" >/dev/null
 niri msg action consume-window-into-column >/dev/null 2>&1
 sleep 1
 "$NIRI_CTX" open UP; sleep 2
 check "S3 window count stable" "$(window_count)" "$c1"
 assert_up_canonical S3
+
+say "=== S3b: role deep-links land on the right herdr workspace ==="
+for role in agents logs editor; do
+    "$NIRI_CTX" open UP "$role" >/dev/null; sleep 1
+    check "S3b deep-link $role" "$(up_work_focused_role)" "$role"
+done
 
 say "=== S4: comms converges from slack exiled to UP ==="
 slack="$(card_id slack)"
@@ -110,7 +120,7 @@ fi
 
 say "=== S6: final focus back to UP docs after open ==="
 "$NIRI_CTX" open UP; sleep 2
-read -r docs _ _ _ _ <<< "$(up_cards)"
+read -r docs _ <<< "$(up_cards)"
 focused="$(niri msg --json windows | jq -r 'first(.[] | select(.is_focused) | .id) // empty')"
 check "S6 focused window is docs card" "$focused" "$docs"
 

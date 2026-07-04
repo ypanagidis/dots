@@ -34,27 +34,27 @@
 
     // Context terminal app IDs are set by niri-ctx.
     window-rule {
-        match app-id=r#"^dev\.yiannis\.niri\.up\.(editor|agents|logs|term)$"#
+        match app-id=r#"^dev\.yiannis\.niri\.up\.(work|editor|agents|logs|term)$"#
         open-on-workspace "UP"
     }
 
     window-rule {
-        match app-id=r#"^dev\.yiannis\.niri\.webroot\.(editor|agents|logs|term)$"#
+        match app-id=r#"^dev\.yiannis\.niri\.webroot\.(work|editor|agents|logs|term)$"#
         open-on-workspace "Webroot"
     }
 
     window-rule {
-        match app-id=r#"^dev\.yiannis\.niri\.sealant\.(editor|agents|logs|term)$"#
+        match app-id=r#"^dev\.yiannis\.niri\.sealant\.(work|editor|agents|logs|term)$"#
         open-on-workspace "Sealant"
     }
 
     window-rule {
-        match app-id=r#"^dev\.yiannis\.niri\.side\.(editor|agents|logs|term)$"#
+        match app-id=r#"^dev\.yiannis\.niri\.side\.(work|editor|agents|logs|term)$"#
         open-on-workspace "Side"
     }
 
     window-rule {
-        match app-id=r#"^dev\.yiannis\.niri\.admin\.(editor|agents|logs|term)$"#
+        match app-id=r#"^dev\.yiannis\.niri\.admin\.(work|editor|agents|logs|term)$"#
         open-on-workspace "Admin"
     }
 

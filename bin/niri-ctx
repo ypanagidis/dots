@@ -123,12 +123,14 @@ terminal_role_name() {
     esac
 }
 
+# One work card per context; roles live INSIDE it as herdr workspaces
+# (tmux windows in the fallback), so the app id no longer carries a role.
 terminal_app_id() {
-    printf '%s.%s.%s\n' "$APP_PREFIX" "$(context_slug "$1")" "$(terminal_role_name "$2")"
+    printf '%s.%s.work\n' "$APP_PREFIX" "$(context_slug "$1")"
 }
 
 terminal_title() {
-    printf '%s-%s\n' "$1" "$(terminal_role_name "$2")"
+    printf '%s-work\n' "$1"
 }
 
 ctx_workspace_id_from_json() {
@@ -354,6 +356,7 @@ focus_or_launch_terminal() {
         fi
         ctx_focus_workspace "$MAIN_OUTPUT" "$ctx"
         focus_window_id "$id"
+        deep_link_role "$ctx" "$role"
         printf '%s\n' "$id"
         return 0
     fi
@@ -370,18 +373,17 @@ focus_or_launch_terminal() {
             printf '%s\n' "$id"
             return 0
         fi
-        if [[ "$attempt" == 1 && "$CONTEXT_TERMINAL" == "ghostty" ]]; then
-            log_line "timeout waiting for terminal ctx=$ctx role=$role app_id=$app_id; killing windowless ghostty and retrying"
-            pkill -f -- "--class=${app_id//./\\.}" 2>/dev/null || true
+        if [[ "$attempt" == 1 ]]; then
+            log_line "timeout waiting for terminal ctx=$ctx role=$role app_id=$app_id; killing windowless terminal and retrying"
+            # ghostty spells it --class=<id>, alacritty --class <id>,<id>
+            pkill -f -- "-class[= ]${app_id//./\\.}" 2>/dev/null || true
             continue
         fi
         break
     done
-    # The final attempt also timed out: reap its windowless ghostty too, or
-    # they accumulate as zombie GTK loops that poison later spawns.
-    if [[ "$CONTEXT_TERMINAL" == "ghostty" ]]; then
-        pkill -f -- "--class=${app_id//./\\.}" 2>/dev/null || true
-    fi
+    # The final attempt also timed out: reap its windowless terminal too, or
+    # hung instances accumulate and poison later spawns.
+    pkill -f -- "-class[= ]${app_id//./\\.}" 2>/dev/null || true
     if ((session_was_fresh)) && herdr_session_exists "$session"; then
         reap_fresh_herdr_session "$session"
     fi
@@ -487,31 +489,17 @@ flatten_tracked_cards() {
 }
 
 open_all() {
-    local ctx="$1" docs_id editor_id agents_id output_id logs_id term_id
+    local ctx="$1" docs_id work_id work_role=editor
     ctx_focus_workspace "$MAIN_OUTPUT" "$ctx"
+    [[ "$ctx" == "Admin" ]] && work_role=term
     # A single slow/failed card must not abort the rest of the context open.
+    # Two cards per context: docs browser + the work terminal (roles are
+    # herdr workspaces inside it). The output browser stays on-demand.
     docs_id="$(focus_or_launch_browser "$ctx" docs || true)"
-    if [[ "$ctx" == "Admin" ]]; then
-        term_id="$(focus_or_launch_terminal "$ctx" term || true)"
-        flatten_tracked_cards "$ctx" "$docs_id" "$term_id"
-        move_column_to_index_if_needed "$docs_id" 1 "$ctx"
-        move_column_to_index_if_needed "$term_id" 2 "$ctx"
-        ctx_focus_workspace "$MAIN_OUTPUT" "$ctx"
-        if [[ -n "$docs_id" ]]; then
-            focus_window_id "$docs_id"
-        fi
-        return 0
-    fi
-    editor_id="$(focus_or_launch_terminal "$ctx" editor || true)"
-    agents_id="$(focus_or_launch_terminal "$ctx" agents || true)"
-    output_id="$(focus_or_launch_browser "$ctx" output || true)"
-    logs_id="$(focus_or_launch_terminal "$ctx" logs || true)"
-    flatten_tracked_cards "$ctx" "$docs_id" "$editor_id" "$agents_id" "$output_id" "$logs_id"
+    work_id="$(focus_or_launch_terminal "$ctx" "$work_role" || true)"
+    flatten_tracked_cards "$ctx" "$docs_id" "$work_id"
     move_column_to_index_if_needed "$docs_id" 1 "$ctx"
-    move_column_to_index_if_needed "$editor_id" 2 "$ctx"
-    move_column_to_index_if_needed "$agents_id" 3 "$ctx"
-    move_column_to_index_if_needed "$output_id" 4 "$ctx"
-    move_column_to_index_if_needed "$logs_id" 5 "$ctx"
+    move_column_to_index_if_needed "$work_id" 2 "$ctx"
     ctx_focus_workspace "$MAIN_OUTPUT" "$ctx"
     if [[ -n "$docs_id" ]]; then
         focus_window_id "$docs_id"
@@ -528,33 +516,82 @@ open_role() {
     esac
 }
 
-tmux_attach_or_create() {
-    local session="$1" window_name="${2:-}" command="${3:-}"
+# Fallback backend: one tmux session per context with a window per role,
+# mirroring the herdr workspace layout.
+tmux_attach_work() {
+    local session="$1" ctx="$2" role="$3" window
+    window="$(role_workspace_label "$ctx" "$role")"
     if ! tmux has-session -t "$session" 2>/dev/null; then
-        if [[ -n "$command" ]]; then
-            tmux new-session -d -s "$session" -c "$PWD" -n "$window_name" "$command"
-        elif [[ -n "$window_name" ]]; then
-            tmux new-session -d -s "$session" -c "$PWD" -n "$window_name"
+        if [[ "$ctx" == "Admin" ]]; then
+            tmux new-session -d -s "$session" -c "$PWD" -n term
         else
-            tmux new-session -d -s "$session" -c "$PWD"
+            tmux new-session -d -s "$session" -c "$PWD" -n editor nvim
+            tmux new-window -d -t "$session" -c "$PWD" -n agents
+            tmux new-window -d -t "$session" -c "$PWD" -n logs
         fi
     fi
+    tmux select-window -t "${session}:${window}" 2>/dev/null || true
     exec tmux attach-session -t "$session"
 }
 
 herdr_session_name_valid() {
-    [[ "${1:-}" =~ ^[A-Za-z]+-(dev|agents|logs|terminal)$ ]]
+    # -work is the current scheme; the rest are legacy per-role sessions that
+    # may still exist and must stay addressable for cleanup.
+    [[ "${1:-}" =~ ^[A-Za-z]+-(work|dev|agents|logs|terminal)$ ]]
 }
 
 role_session_name() {
     local ctx="$1" role="$2"
     case "$role" in
-        editor) printf '%s-dev\n' "$ctx" ;;
-        agents) printf '%s-agents\n' "$ctx" ;;
-        logs) printf '%s-logs\n' "$ctx" ;;
-        term) printf '%s-terminal\n' "$ctx" ;;
+        editor|agents|logs|term) printf '%s-work\n' "$ctx" ;;
         *) return 1 ;;
     esac
+}
+
+herdr_sock_for_session() {
+    printf '%s/.config/herdr/sessions/%s/herdr.sock\n' "$HOME" "$1"
+}
+
+# Admin's work session has a single shell workspace; every other context
+# gets one workspace per role.
+role_workspace_label() {
+    local ctx="$1" role="$2"
+    if [[ "$ctx" == "Admin" ]]; then
+        printf 'term\n'
+    else
+        printf '%s\n' "$role"
+    fi
+}
+
+# Focus (creating it first if missing) the herdr workspace for a role inside
+# a context's work session. Silently a no-op while the socket is not up; the
+# bootstrap armer owns the fresh-session window.
+herdr_focus_role_workspace() {
+    local session="$1" ctx="$2" role="$3" sock label wsid dir
+    sock="$(herdr_sock_for_session "$session")"
+    [[ -S "$sock" ]] || return 0
+    label="$(role_workspace_label "$ctx" "$role")"
+    dir="${CTX_DIR[$ctx]:-$HOME}"
+    wsid="$(timeout 2 env HERDR_SOCKET_PATH="$sock" herdr workspace list 2>/dev/null \
+        | jq -r --arg label "$label" 'first(.result.workspaces[]? | select(.label == $label) | .workspace_id) // empty')"
+    if [[ -z "$wsid" ]]; then
+        timeout 2 env HERDR_SOCKET_PATH="$sock" herdr workspace create --label "$label" --cwd "$dir" --focus >/dev/null 2>&1 || true
+        return 0
+    fi
+    timeout 2 env HERDR_SOCKET_PATH="$sock" herdr workspace focus "$wsid" >/dev/null 2>&1 || true
+}
+
+# Land on a role from outside the card: herdr workspace focus over the
+# session socket, or tmux select-window in the fallback backend.
+deep_link_role() {
+    local ctx="$1" role="$2" session window
+    session="$(role_session_name "$ctx" "$role")" || return 0
+    if [[ "${SESSION_BACKEND:-herdr}" == "herdr" ]] && command -v herdr >/dev/null 2>&1; then
+        herdr_focus_role_workspace "$session" "$ctx" "$role"
+    elif command -v tmux >/dev/null 2>&1; then
+        window="$(role_workspace_label "$ctx" "$role")"
+        tmux select-window -t "${session}:${window}" 2>/dev/null || true
+    fi
 }
 
 # Tear down a herdr session that THIS launch just created but whose terminal
@@ -580,52 +617,65 @@ herdr_session_exists() {
         <<< "$sessions_json" >/dev/null 2>&1
 }
 
-arm_herdr_nvim_injector() {
-    local session="$1" sock
+# Bootstrap a FRESH work session in the background once its socket appears:
+# name the default workspace, start nvim in editor, pre-create the remaining
+# role workspaces, then land on the requested role. Every step is idempotent
+# and best-effort so a half-bootstrapped session converges on the next open.
+arm_herdr_bootstrap() {
+    local session="$1" ctx="$2" role="$3" sock dir
     herdr_session_name_valid "$session" || return 0
-    sock="$HOME/.config/herdr/sessions/${session}/herdr.sock"
+    sock="$(herdr_sock_for_session "$session")"
+    dir="${CTX_DIR[$ctx]:-$HOME}"
     (
-        local pane candidates
+        local pane label
         for _ in $(seq 1 50); do
             [[ -S "$sock" ]] && break
             sleep 0.2
         done
         [[ -S "$sock" ]] || exit 0
         sleep 0.5
-        # herdr's socket CLI replies in JSON (verified live on herdr 0.7.1):
-        # pane current → {"result":{"pane":{"pane_id":"w1:p1",...}}}
-        pane="$(
-            timeout 2 env HERDR_SOCKET_PATH="$sock" herdr pane current 2>/dev/null \
-                | jq -r '.result.pane.pane_id // empty' 2>/dev/null || true
-        )"
-        if [[ -z "$pane" ]]; then
-            pane="$(
-                timeout 2 env HERDR_SOCKET_PATH="$sock" herdr pane list 2>/dev/null \
-                    | jq -r '.result.panes[0].pane_id // empty' 2>/dev/null || true
-            )"
+        if [[ "$ctx" == "Admin" ]]; then
+            timeout 2 env HERDR_SOCKET_PATH="$sock" herdr workspace rename w1 term >/dev/null 2>&1 || true
+            exit 0
         fi
-        [[ "$pane" =~ ^[A-Za-z0-9:_-]+$ ]] || exit 0
-        timeout 2 env HERDR_SOCKET_PATH="$sock" herdr pane run "$pane" nvim >/dev/null 2>&1 || true
+        timeout 2 env HERDR_SOCKET_PATH="$sock" herdr workspace rename w1 editor >/dev/null 2>&1 || true
+        # herdr's socket CLI replies in JSON (verified live on herdr 0.7.1):
+        # pane list → {"result":{"panes":[{"pane_id":"w1:p1",...}]}}
+        pane="$(
+            timeout 2 env HERDR_SOCKET_PATH="$sock" herdr pane list --workspace w1 2>/dev/null \
+                | jq -r '.result.panes[0].pane_id // empty' 2>/dev/null || true
+        )"
+        if [[ "$pane" =~ ^[A-Za-z0-9:_-]+$ ]]; then
+            timeout 2 env HERDR_SOCKET_PATH="$sock" herdr pane run "$pane" nvim >/dev/null 2>&1 || true
+        fi
+        for label in agents logs; do
+            timeout 2 env HERDR_SOCKET_PATH="$sock" herdr workspace create --label "$label" --cwd "$dir" --no-focus >/dev/null 2>&1 || true
+        done
+        herdr_focus_role_workspace "$session" "$ctx" "$role"
     ) >/dev/null 2>&1 &
 }
 
 try_herdr_attach() {
-    local session="$1" role="$2" fresh=0 rc started ended
+    local session="$1" ctx="$2" role="$3" fresh=0 rc started ended
     herdr_session_name_valid "$session" || {
         log_line "invalid herdr session name session=$session role=$role"
         return 1
     }
-    if [[ "$role" == "editor" ]]; then
-        if ! herdr_session_exists "$session"; then
-            fresh=1
-        fi
-        if ((fresh)); then
-            arm_herdr_nvim_injector "$session"
-        fi
+    if ! herdr_session_exists "$session"; then
+        fresh=1
+    fi
+    if ((fresh)); then
+        arm_herdr_bootstrap "$session" "$ctx" "$role"
+    else
+        herdr_focus_role_workspace "$session" "$ctx" "$role"
     fi
     started="$(date +%s)"
     set +e
-    HERDR_STARTUP_CWD="$PWD" herdr --session "$session"
+    # herdr refuses to nest; this attach may run from a shell that already
+    # lives inside a herdr pane, so strip the inherited markers.
+    env -u HERDR_ENV -u HERDR_PANE_ID -u HERDR_SESSION -u HERDR_SOCKET_PATH \
+        -u HERDR_TAB_ID -u HERDR_WORKSPACE_ID \
+        HERDR_STARTUP_CWD="$PWD" herdr --session "$session"
     rc=$?
     set -e
     ended="$(date +%s)"
@@ -657,23 +707,15 @@ run_tmux_role() {
     dir="${CTX_DIR[$ctx]:-$HOME}"
     cd "$dir" 2>/dev/null || cd "$HOME"
     printf '\033]0;%s\007' "$(terminal_title "$ctx" "$role")"
-    case "$role" in
-        editor) session="${ctx}-dev" ;;
-        agents) session="${ctx}-agents" ;;
-        logs) session="${ctx}-logs" ;;
-        term) session="${ctx}-terminal" ;;
-    esac
+    session="$(role_session_name "$ctx" "$role")"
     if [[ "${SESSION_BACKEND:-herdr}" == "herdr" ]]; then
         if command -v herdr >/dev/null 2>&1; then
-            try_herdr_attach "$session" "$role" || true
+            try_herdr_attach "$session" "$ctx" "$role" || true
         else
             log_line "SESSION_BACKEND=herdr but herdr missing; falling back to tmux session=$session role=$role"
         fi
     fi
-    case "$role" in
-        editor) tmux_attach_or_create "$session" nvim nvim ;;
-        *) tmux_attach_or_create "$session" ;;
-    esac
+    tmux_attach_work "$session" "$ctx" "$role"
 }
 
 app_id_for_comms_app() {
@@ -1118,7 +1160,7 @@ doctor() {
             failures=$((failures + 1))
         fi
     done
-    for bin in jq tmux ghostty; do
+    for bin in jq tmux "$CONTEXT_TERMINAL"; do
         if command -v "$bin" >/dev/null 2>&1; then
             doctor_line PASS "binary $bin"
         else
