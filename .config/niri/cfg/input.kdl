@@ -26,6 +26,8 @@ input {
         //accel-speed 0.0
     }
 
-    focus-follows-mouse // Automatically focus windows under the mouse pointer
+    // max-scroll-amount="0%": only follow the mouse onto cards already fully on
+    // screen, so brushing the screen edge no longer scrolls to the next card.
+    focus-follows-mouse max-scroll-amount="0%"
     workspace-auto-back-and-forth // Enable workspace back & forth switching
 }
