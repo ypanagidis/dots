@@ -263,7 +263,14 @@ wait_for_app_id() {
 wait_for_new_helium() {
     local before_ids="$1" timeout_seconds="${2:-10}" filter
     export NIRI_CTX_BEFORE_IDS="$before_ids"
-    filter='first((.WindowsChanged.windows[]?, .WindowOpenedOrChanged.window?) | select(.app_id == "helium") | select(((env.NIRI_CTX_BEFORE_IDS | split(",") | map(select(length > 0))) | index(.id | tostring)) | not) | .id) // empty'
+    # Bind the window id to $wid before the index() check: a jq function
+    # argument is evaluated against the function's OWN input (the before-ids
+    # array), so a bare `.id` in there indexes the array and errors out.
+    filter='first((.WindowsChanged.windows[]?, .WindowOpenedOrChanged.window?)
+        | select(.app_id == "helium")
+        | (.id | tostring) as $wid
+        | select((env.NIRI_CTX_BEFORE_IDS | split(",") | map(select(length > 0)) | index($wid)) | not)
+        | .id) // empty'
     ctx_wait_window "$filter" "$timeout_seconds"
 }
 
