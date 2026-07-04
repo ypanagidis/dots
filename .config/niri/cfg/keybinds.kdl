@@ -111,10 +111,9 @@ binds {
     // Hyper, "Hyper+Shift+..." cannot be a distinct Niri binding.
     CTRL+ALT+Shift+Super+A              hotkey-overlay-title="Context Docs: Helium" repeat=false { spawn "/home/yiannis/.local/bin/niri-ctx" "open" "current" "docs"; }
     CTRL+ALT+Shift+Super+G              hotkey-overlay-title="Context Editor: tmux dev" repeat=false { spawn "/home/yiannis/.local/bin/niri-ctx" "open" "current" "editor"; }
-    CTRL+ALT+Shift+Super+C              hotkey-overlay-title="Context Terminal: tmux terminal" repeat=false { spawn "/home/yiannis/.local/bin/niri-ctx" "open" "current" "term"; }
+    CTRL+ALT+Shift+Super+C              hotkey-overlay-title="Context Agents: herdr" repeat=false { spawn "/home/yiannis/.local/bin/niri-ctx" "open" "current" "agents"; }
     CTRL+ALT+Shift+Super+R              hotkey-overlay-title="Context Agents: tmux/herdr" repeat=false { spawn "/home/yiannis/.local/bin/niri-ctx" "open" "current" "agents"; }
     CTRL+ALT+Shift+Super+T              hotkey-overlay-title="Top Ambient: Spotify" repeat=false { spawn "/home/yiannis/.local/bin/niri-ctx" "spotify"; }
-    CTRL+ALT+Shift+Super+F              hotkey-overlay-title="Frontend Mode" repeat=false { spawn "/home/yiannis/.local/bin/niri-ctx" "frontend"; }
     CTRL+ALT+Shift+Super+Escape         hotkey-overlay-title="Top Ambient" repeat=false { spawn "/home/yiannis/.local/bin/niri-ctx" "top-ambient"; }
     CTRL+ALT+Shift+Super+V              hotkey-overlay-title="Restore Comms Layout" repeat=false { spawn "/home/yiannis/.local/bin/niri-ctx" "comms"; }
     CTRL+ALT+Shift+Super+D              hotkey-overlay-title="Move Window to DevTools Workspace" repeat=false { spawn "/home/yiannis/.local/bin/niri-ctx" "devtools-here"; }

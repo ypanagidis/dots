@@ -29,7 +29,6 @@ usage() {
 usage:
   niri-ctx open <UP|Webroot|Sealant|Side|Admin|current> [all|docs|output|editor|agents|logs|term]
   niri-ctx comms
-  niri-ctx frontend [ctx]
   niri-ctx devtools-here
   niri-ctx top-ambient
   niri-ctx spotify
@@ -200,8 +199,10 @@ ctx_focus_workspace() {
 
 window_id_by_app_id() {
     local app_id="$1"
+    # Deterministic pick: JSON order is unstable (HashMap), so with duplicate
+    # windows always choose the oldest (lowest id).
     niri msg --json windows \
-        | jq -r --arg app_id "$app_id" 'first(.[] | select(.app_id == $app_id) | .id) // empty'
+        | jq -r --arg app_id "$app_id" '[.[] | select(.app_id == $app_id) | .id] | sort | (.[0] // empty)'
 }
 
 terminal_window_id() {
@@ -274,25 +275,26 @@ wait_for_new_helium() {
     ctx_wait_window "$filter" "$timeout_seconds"
 }
 
+# Cache format: line 1 = window id, line 2 = NIRI_SOCKET the id belongs to.
+# Window ids restart when the compositor restarts, so an id from a previous
+# compositor instance must never be trusted.
 valid_browser_cache_id() {
-    local ctx="$1" role="$2" cache_file id workspaces_json windows_json workspace_id found_id
+    local ctx="$1" role="$2" cache_file id cached_sock found_id
     cache_file="$(browser_cache_file "$ctx" "$role")"
     [[ -f "$cache_file" ]] || return 1
-    id="$(< "$cache_file")"
+    { IFS= read -r id || true; IFS= read -r cached_sock || true; } < "$cache_file"
     if ! is_uint "$id"; then
         rm -f "$cache_file"
         return 1
     fi
-    workspaces_json="$(niri msg --json workspaces)"
-    workspace_id="$(ctx_workspace_id_from_json "$workspaces_json" "$ctx")"
-    if ! is_uint "$workspace_id"; then
+    if [[ -n "$cached_sock" && "$cached_sock" != "${NIRI_SOCKET:-}" ]]; then
         rm -f "$cache_file"
         return 1
     fi
-    windows_json="$(niri msg --json windows)"
-    found_id="$(jq -r --argjson id "$id" --argjson workspace_id "$workspace_id" \
-        'first(.[] | select(.id == $id and .app_id == "helium" and .workspace_id == $workspace_id) | .id) // empty' \
-        <<< "$windows_json")"
+    # The window may live on ANY workspace (the caller re-homes it); it just
+    # has to exist and still be a helium window.
+    found_id="$(niri msg --json windows | jq -r --argjson id "$id" \
+        'first(.[] | select(.id == $id and .app_id == "helium") | .id) // empty')"
     if [[ "$found_id" == "$id" ]]; then
         printf '%s\n' "$id"
         return 0
@@ -305,7 +307,7 @@ atomic_cache_write() {
     local file="$1" value="$2" tmp
     mkdir -p "$(dirname -- "$file")"
     tmp="$(mktemp "$(dirname -- "$file")/.tmp.XXXXXX")"
-    printf '%s\n' "$value" > "$tmp"
+    printf '%s\n%s\n' "$value" "${NIRI_SOCKET:-}" > "$tmp"
     mv -f "$tmp" "$file"
 }
 
@@ -339,8 +341,9 @@ launch_terminal_role() {
 }
 
 focus_or_launch_terminal() {
-    local ctx="$1" role="$2" id app_id ctx_ws_id cur_ws_id attempt
+    local ctx="$1" role="$2" id app_id ctx_ws_id cur_ws_id attempt session session_was_fresh=0
     role="$(terminal_role_name "$role")"
+    session="$(role_session_name "$ctx" "$role" || true)"
     id="$(terminal_window_id "$ctx" "$role")"
     if [[ -n "$id" ]]; then
         # Re-home a card that was moved off its context workspace.
@@ -356,6 +359,9 @@ focus_or_launch_terminal() {
     fi
     ctx_focus_workspace "$MAIN_OUTPUT" "$ctx"
     app_id="$(terminal_app_id "$ctx" "$role")"
+    if [[ "${SESSION_BACKEND:-herdr}" == "herdr" ]] && ! herdr_session_exists "$session"; then
+        session_was_fresh=1
+    fi
     for attempt in 1 2; do
         launch_terminal_role "$ctx" "$role"
         id="$(wait_for_app_id "$app_id" 10 || true)"
@@ -376,17 +382,26 @@ focus_or_launch_terminal() {
     if [[ "$CONTEXT_TERMINAL" == "ghostty" ]]; then
         pkill -f -- "--class=${app_id//./\\.}" 2>/dev/null || true
     fi
+    if ((session_was_fresh)) && herdr_session_exists "$session"; then
+        reap_fresh_herdr_session "$session"
+    fi
     log_line "timeout waiting for terminal ctx=$ctx role=$role app_id=$app_id"
     return 1
 }
 
 focus_or_launch_browser() {
-    local ctx="$1" role="$2" id before_ids helium cache_file profile
+    local ctx="$1" role="$2" id before_ids helium cache_file profile ctx_ws_id cur_ws_id
     case "$role" in
         docs|output) ;;
         *) return 1 ;;
     esac
     if id="$(valid_browser_cache_id "$ctx" "$role")"; then
+        # Re-home a browser card that was moved off its context workspace.
+        ctx_ws_id="$(ctx_workspace_id_from_json "$(niri msg --json workspaces)" "$ctx")"
+        cur_ws_id="$(window_workspace_id_for_id "$id" || true)"
+        if is_uint "$ctx_ws_id" && [[ "$cur_ws_id" != "$ctx_ws_id" ]]; then
+            niri_action move-window-to-workspace --window-id "$id" --focus false "$ctx" || true
+        fi
         ctx_focus_workspace "$MAIN_OUTPUT" "$ctx"
         focus_window_id "$id"
         printf '%s\n' "$id"
@@ -442,6 +457,35 @@ move_column_to_index_if_needed() {
     niri_action move-column-to-index "$expected_index" || true
 }
 
+# Break apart columns that contain 2+ of OUR tracked card windows, so the
+# one-card-per-column order can always be rebuilt — without disturbing any
+# stack the user built out of non-card windows.
+flatten_tracked_cards() {
+    local ctx="$1"; shift
+    local ids=() id workspace_id ids_json target
+    for id in "$@"; do
+        is_uint "$id" && ids+=("$id")
+    done
+    ((${#ids[@]} > 1)) || return 0
+    workspace_id="$(ctx_workspace_id_from_json "$(niri msg --json workspaces)" "$ctx")"
+    is_uint "$workspace_id" || return 0
+    ids_json="$(jq -nc '$ARGS.positional | map(tonumber)' --args "${ids[@]}")"
+    for _ in 1 2 3 4 5 6 7 8; do
+        target="$(niri msg --json windows | jq -r --argjson ws "$workspace_id" --argjson ids "$ids_json" '
+            [.[] | select(.workspace_id == $ws and .is_floating == false and .layout.pos_in_scrolling_layout != null)
+                 | select(.id as $i | $ids | index($i))]
+            | group_by(.layout.pos_in_scrolling_layout[0])
+            | map(select(length > 1))
+            | if length == 0 then empty
+              else (.[0] | sort_by(.layout.pos_in_scrolling_layout[1]) | .[-1].id)
+              end')"
+        is_uint "$target" || return 0
+        niri_action focus-window --id "$target" || return 0
+        niri_action expel-window-from-column || return 0
+        sleep 0.1
+    done
+}
+
 open_all() {
     local ctx="$1" docs_id editor_id agents_id output_id logs_id term_id
     ctx_focus_workspace "$MAIN_OUTPUT" "$ctx"
@@ -449,6 +493,7 @@ open_all() {
     docs_id="$(focus_or_launch_browser "$ctx" docs || true)"
     if [[ "$ctx" == "Admin" ]]; then
         term_id="$(focus_or_launch_terminal "$ctx" term || true)"
+        flatten_tracked_cards "$ctx" "$docs_id" "$term_id"
         move_column_to_index_if_needed "$docs_id" 1 "$ctx"
         move_column_to_index_if_needed "$term_id" 2 "$ctx"
         ctx_focus_workspace "$MAIN_OUTPUT" "$ctx"
@@ -461,6 +506,7 @@ open_all() {
     agents_id="$(focus_or_launch_terminal "$ctx" agents || true)"
     output_id="$(focus_or_launch_browser "$ctx" output || true)"
     logs_id="$(focus_or_launch_terminal "$ctx" logs || true)"
+    flatten_tracked_cards "$ctx" "$docs_id" "$editor_id" "$agents_id" "$output_id" "$logs_id"
     move_column_to_index_if_needed "$docs_id" 1 "$ctx"
     move_column_to_index_if_needed "$editor_id" 2 "$ctx"
     move_column_to_index_if_needed "$agents_id" 3 "$ctx"
@@ -498,6 +544,31 @@ tmux_attach_or_create() {
 
 herdr_session_name_valid() {
     [[ "${1:-}" =~ ^[A-Za-z]+-(dev|agents|logs|terminal)$ ]]
+}
+
+role_session_name() {
+    local ctx="$1" role="$2"
+    case "$role" in
+        editor) printf '%s-dev\n' "$ctx" ;;
+        agents) printf '%s-agents\n' "$ctx" ;;
+        logs) printf '%s-logs\n' "$ctx" ;;
+        term) printf '%s-terminal\n' "$ctx" ;;
+        *) return 1 ;;
+    esac
+}
+
+# Tear down a herdr session that THIS launch just created but whose terminal
+# window never appeared. An orphaned zero-content server left behind by a
+# failed spawn is exactly the state observed to wedge the next attach
+# (2026-07-04: UP-logs/UP-agents blank cards). Only ever called when the
+# session did not exist before the launch, so nothing of the user's is lost.
+reap_fresh_herdr_session() {
+    local session="$1"
+    herdr_session_name_valid "$session" || return 0
+    command -v herdr >/dev/null 2>&1 || return 0
+    log_line "reaping fresh herdr session after spawn timeout session=$session"
+    timeout 3 herdr session stop "$session" >/dev/null 2>&1 || true
+    timeout 3 herdr session delete "$session" >/dev/null 2>&1 || true
 }
 
 herdr_session_exists() {
@@ -758,46 +829,6 @@ restore_comms() {
     focus_window_id "$first_id"
 }
 
-move_project_devtools() {
-    local ctx="$1" workspaces_json windows_json ctx_ws_id devtools_ws_id ids id
-    workspaces_json="$(niri msg --json workspaces)"
-    ctx_ws_id="$(ctx_workspace_id_from_json "$workspaces_json" "$ctx")"
-    devtools_ws_id="$(ctx_workspace_id_from_json "$workspaces_json" "${ctx}-devtools")"
-    is_uint "$ctx_ws_id" || return 0
-    is_uint "$devtools_ws_id" || return 0
-    windows_json="$(niri msg --json windows)"
-    mapfile -t ids < <(jq -r --argjson ctx_ws_id "$ctx_ws_id" --argjson devtools_ws_id "$devtools_ws_id" '
-        .[]
-        | select(.app_id == "helium")
-        | select((.title // "") | test("DevTools|Developer Tools"; "i"))
-        | select(.workspace_id == $ctx_ws_id or .workspace_id == $devtools_ws_id)
-        | .id
-    ' <<< "$windows_json")
-    for id in "${ids[@]}"; do
-        is_uint "$id" || continue
-        niri_action move-window-to-workspace --window-id "$id" --focus false "${ctx}-devtools" || true
-        niri_action move-window-to-monitor --id "$id" "$TOP_OUTPUT" || true
-    done
-}
-
-frontend_mode() {
-    local ctx="${1:-}"
-    if [[ -z "$ctx" ]]; then
-        ctx="$(current_context)"
-    elif ! ctx="$(normalize_context "$ctx")"; then
-        die "usage: niri-ctx frontend [UP|Webroot|Sealant|Side|Admin|current]"
-    fi
-    if [[ "$ctx" == "Admin" ]]; then
-        # Admin has no devtools workspace; just surface the output browser.
-        focus_or_launch_browser "$ctx" output >/dev/null || true
-        return 0
-    fi
-    focus_or_launch_browser "$ctx" output >/dev/null || true
-    ctx_focus_workspace "$TOP_OUTPUT" "${ctx}-devtools"
-    move_project_devtools "$ctx"
-    ctx_focus_workspace "$MAIN_OUTPUT" "$ctx"
-}
-
 devtools_here() {
     local windows_json workspaces_json focused_id focused_ws_id focused_ws ctx
     windows_json="$(niri msg --json windows)"
@@ -815,7 +846,6 @@ devtools_here() {
         return 0
     fi
     niri_action move-window-to-workspace --window-id "$focused_id" --focus false "${ctx}-devtools" || true
-    niri_action move-window-to-monitor --id "$focused_id" "$TOP_OUTPUT" || true
     ctx_focus_workspace "$TOP_OUTPUT" "${ctx}-devtools"
     ctx_focus_workspace "$MAIN_OUTPUT" "$ctx"
 }
@@ -842,8 +872,10 @@ focus_spotify() {
         id="$(wait_for_app_id "Spotify" 20 || true)"
     fi
     [[ -n "$id" ]] || return 0
+    # Moving to the NAMED workspace is sufficient and deterministic; a
+    # follow-up move-window-to-monitor would re-move the window onto whatever
+    # workspace happens to be active on that output.
     niri_action move-window-to-workspace --window-id "$id" --focus false "$TOP_WORKSPACE" || true
-    niri_action move-window-to-monitor --id "$id" "$TOP_OUTPUT" || true
     ctx_focus_workspace "$TOP_OUTPUT" "$TOP_WORKSPACE"
     focus_window_id "$id"
 }
@@ -876,10 +908,6 @@ focus_only_when_locked() {
             ctx_focus_workspace "$COMMS_OUTPUT" "$COMMS_WORKSPACE"
             id="$(window_id_by_app_id slack)"
             [[ -n "$id" ]] && focus_window_id "$id"
-            ;;
-        frontend)
-            [[ -n "$ctx" ]] && ctx_focus_workspace "$TOP_OUTPUT" "${ctx}-devtools"
-            [[ -n "$ctx" ]] && ctx_focus_workspace "$MAIN_OUTPUT" "$ctx"
             ;;
         spotify)
             id="$(spotify_window_id)"
@@ -1208,17 +1236,6 @@ main() {
             [[ $# -eq 0 ]] || die "comms takes no arguments"
             with_global_lock comms
             restore_comms
-            ;;
-        frontend)
-            shift
-            local ctx_arg="${1:-}"
-            if [[ -z "$ctx_arg" || "$ctx_arg" == "current" ]]; then
-                ctx_arg="$(current_context)"
-            elif ! ctx_arg="$(normalize_context "$ctx_arg")"; then
-                die "usage: niri-ctx frontend [UP|Webroot|Sealant|Side|Admin|current]"
-            fi
-            with_global_lock frontend "$ctx_arg"
-            frontend_mode "$ctx_arg"
             ;;
         devtools-here)
             shift

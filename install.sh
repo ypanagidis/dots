@@ -59,29 +59,12 @@ for name in "${legacy_names[@]}"; do
     fi
 done
 
-mkdir -p "$USER_SYSTEMD"
-if [[ -e "$UNIT_SRC" ]]; then
-    ln -sfn "$UNIT_SRC" "$UNIT_DST"
-    info "linked $UNIT_DST"
-else
-    warn "systemd unit not present yet: $UNIT_SRC"
-fi
-
-if command -v systemctl >/dev/null 2>&1; then
-    if systemctl --user daemon-reload; then
-        info "systemd user daemon reloaded"
-    else
-        warn "systemctl --user daemon-reload failed"
-    fi
-    if [[ -e "$UNIT_DST" ]]; then
-        if systemctl --user enable --now "$UNIT_NAME"; then
-            info "enabled $UNIT_NAME"
-        else
-            warn "could not enable/start $UNIT_NAME outside an active user session"
-        fi
-    fi
-else
-    warn "systemctl not found"
+# The niri-ctx watch daemon (DP-2 auto-follow) is DISABLED by default per the
+# user's 2026-07-04 decision (TOP_FOLLOW=off). The unit file stays in the repo;
+# to opt back in: set TOP_FOLLOW in contexts.conf, then
+#   ln -sfn "$UNIT_SRC" "$UNIT_DST" && systemctl --user daemon-reload && systemctl --user enable --now niri-ctx-watch
+if command -v systemctl >/dev/null 2>&1 && systemctl --user is-enabled "$UNIT_NAME" >/dev/null 2>&1; then
+    info "$UNIT_NAME already enabled; leaving it as-is"
 fi
 
 if [[ -L "$NIRI_LINK" ]]; then

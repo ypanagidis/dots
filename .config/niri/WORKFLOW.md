@@ -55,10 +55,9 @@ Hyper on this keyboard emits `CTRL+ALT+Shift+Super`. Because Shift is already pa
 - `Hyper+5`: `niri-ctx open Admin`
 - `Hyper+A`: `niri-ctx open current docs`
 - `Hyper+G`: `niri-ctx open current editor`
-- `Hyper+C`: `niri-ctx open current term`
-- `Hyper+R`: `niri-ctx open current agents`
+- `Hyper+C`: `niri-ctx open current agents`
+- `Hyper+R`: `niri-ctx open current agents` (same as `Hyper+C`; the `term` role exists but is unbound)
 - `Hyper+T`: `niri-ctx spotify`
-- `Hyper+F`: `niri-ctx frontend`
 - `Hyper+Escape`: `niri-ctx top-ambient`
 - `Hyper+V`: `niri-ctx comms`
 - `Hyper+D`: `niri-ctx devtools-here`
@@ -118,7 +117,6 @@ Supported `niri-ctx` commands:
 ```sh
 niri-ctx open <UP|Webroot|Sealant|Side|Admin|current> [all|docs|output|editor|agents|logs|term]
 niri-ctx comms
-niri-ctx frontend [ctx]
 niri-ctx devtools-here
 niri-ctx top-ambient
 niri-ctx spotify
@@ -189,14 +187,15 @@ SESSION_BACKEND="herdr"
 Top-display follow behavior:
 
 ```bash
-TOP_FOLLOW="devtools"
+TOP_FOLLOW="off"
 ```
 
-Values:
-
-- `devtools`: focusing a project Helium window on `DP-1` switches `DP-2` to that context's DevTools workspace.
-- `ambient`: browser focus switches to DevTools, and non-browser project focus returns `DP-2` to `top-ambient`.
-- `off`: the watch daemon does not change the top display.
+`DP-2` auto-switching is DISABLED (2026-07-04): the top display changes only via
+`Hyper+Escape` (ambient) or `Hyper+D` (move a window to devtools). To opt back in,
+set `TOP_FOLLOW` to `devtools` or `ambient` and enable the watch service by hand
+(see install.sh comments); `devtools` switches `DP-2` to the focused project's
+DevTools workspace when a project browser card gains focus, `ambient` additionally
+returns `DP-2` to `top-ambient` on non-browser focus.
 
 ## Browser Cards
 
@@ -206,7 +205,7 @@ Helium cards are tracked by cache files under:
 ${XDG_CACHE_HOME:-$HOME/.cache}/niri-ctx/
 ```
 
-Each docs/output cache entry is valid only if the window still exists, is `app_id == "helium"`, and is on the target context workspace. Stale cache entries are ignored and removed.
+Each cache entry stores the window id plus the compositor socket it belongs to; it is valid only if that socket matches the running compositor and the window still exists as `app_id == "helium"`. A valid card that drifted to another workspace is moved back to its context workspace on the next open. Stale entries are removed automatically.
 
 ## Terminal Sessions
 
@@ -248,41 +247,20 @@ or press `Hyper+V`.
 
 The dispatcher opens missing Slack, Telegram, and Discord windows, ensures they are on `comms`, orders them Slack, Telegram, Discord, and stacks them into one column when possible.
 
-## Frontend Mode
+## DevTools
 
-Run:
-
-```sh
-niri-ctx frontend
-```
-
-or press `Hyper+F`.
-
-Frontend mode opens or focuses the current context output browser, switches `DP-2` to the matching `<context>-devtools` workspace, moves matching detached Helium DevTools windows for that same context, and returns focus to the main project workspace.
-
-If a DevTools window needs manual placement, focus it and press `Hyper+D` to run:
+Frontend mode was removed (2026-07-04). To put a DevTools window on the top display,
+focus it and press `Hyper+D` to run:
 
 ```sh
 niri-ctx devtools-here
 ```
 
-## Watch Daemon
+## Watch Daemon (disabled)
 
-`niri-ctx watch` is managed by the user service:
-
-```text
-.config/systemd/user/niri-ctx-watch.service
-```
-
-The service starts after `graphical-session.target`, runs:
-
-```sh
-%h/.local/bin/niri-ctx watch
-```
-
-and restarts only on failure. In non-niri sessions the daemon exits successfully when `NIRI_SOCKET` is unset or unreachable.
-
-The watch daemon reads niri's event stream and keeps `DP-2` aligned with project browser focus according to `TOP_FOLLOW`. It ignores its own focus changes and does not react to windows on the top display.
+`niri-ctx watch` exists but is NOT enabled: `TOP_FOLLOW="off"` and the
+`niri-ctx-watch.service` unit is disabled and unlinked. install.sh does not
+re-enable it. The unit file remains in the repo for opting back in.
 
 ## Health Check
 
@@ -307,11 +285,8 @@ If a browser card focuses the wrong window:
 - Run `niri-ctx doctor`.
 - Remove stale entries under `${XDG_CACHE_HOME:-$HOME/.cache}/niri-ctx/` only after confirming the window no longer exists.
 
-If `DP-2` does not follow browser focus:
-
-- Check `TOP_FOLLOW` in `.config/niri/contexts.conf`.
-- Check `systemctl --user status niri-ctx-watch.service`.
-- Confirm `NIRI_SOCKET` is set inside the graphical session.
+`DP-2` does not follow browser focus: this is intentional (`TOP_FOLLOW="off"`,
+watch service disabled). Use `Hyper+Escape` / `Hyper+D`.
 
 If terminal sessions do not start:
 
