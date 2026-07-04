@@ -653,8 +653,29 @@ right_column_first_id() {
     '
 }
 
+# Break up every multi-window tiled column on the workspace so each window
+# sits in its own column. The stack builder assumes singleton columns; Hyper+V
+# must converge from ANY starting arrangement, including partial stacks.
+flatten_workspace_columns() {
+    local workspace_id="$1" target
+    is_uint "$workspace_id" || return 0
+    for _ in 1 2 3 4 5 6 7 8; do
+        target="$(niri msg --json windows | jq -r --argjson ws "$workspace_id" '
+            [.[] | select(.workspace_id == $ws and .is_floating == false and .layout.pos_in_scrolling_layout != null)]
+            | group_by(.layout.pos_in_scrolling_layout[0])
+            | map(select(length > 1))
+            | if length == 0 then empty
+              else (.[0] | sort_by(.layout.pos_in_scrolling_layout[1]) | .[-1].id)
+              end')"
+        is_uint "$target" || return 0
+        niri_action focus-window --id "$target" || return 0
+        niri_action expel-window-from-column || return 0
+        sleep 0.1
+    done
+}
+
 restore_comms() {
-    local app app_id id ids=() present_apps=() stacking_ids=() workspace_id col right_id first_id
+    local app app_id id ids=() present_apps=() stacking_ids=() workspace_id col right_id first_id first_col same_col height
     for app in slack telegram discord; do
         app_id="$(app_id_for_comms_app "$app")"
         id="$(window_id_by_app_id "$app_id")"
@@ -687,30 +708,45 @@ restore_comms() {
         fi
     done
     ((${#stacking_ids[@]} > 0)) || return 0
-    for i in "${!stacking_ids[@]}"; do
-        focus_window_id "${stacking_ids[$i]}"
-        niri_action move-column-to-index "$((i + 1))" || true
-    done
     first_id="${stacking_ids[0]}"
-    focus_window_id "$first_id"
-    niri_action set-column-width "100%" || true
-    for id in "${stacking_ids[@]:1}"; do
-        # The layout may lag behind the moves above; re-check a few times
-        # before giving up on stacking this window.
-        for _ in 1 2 3 4; do
-            col="$(column_index_for_id "$first_id")"
-            is_uint "$col" || break
-            right_id="$(right_column_first_id "$workspace_id" "$col")"
-            if [[ "$right_id" == "$id" ]]; then
-                focus_window_id "$first_id"
-                niri_action consume-window-into-column || true
-                break
-            fi
-            sleep 0.1
+    # Already one shared column? Then only heights may need fixing — skip the
+    # tear-down/rebuild churn.
+    same_col=1
+    first_col="$(column_index_for_id "$first_id" || true)"
+    if is_uint "$first_col"; then
+        for id in "${stacking_ids[@]:1}"; do
+            [[ "$(column_index_for_id "$id" || true)" == "$first_col" ]] || { same_col=0; break; }
         done
-    done
+    else
+        same_col=0
+    fi
+    if ((same_col == 0)); then
+        flatten_workspace_columns "$workspace_id"
+        for i in "${!stacking_ids[@]}"; do
+            focus_window_id "${stacking_ids[$i]}"
+            niri_action move-column-to-index "$((i + 1))" || true
+        done
+        focus_window_id "$first_id"
+        niri_action set-column-width "100%" || true
+        for id in "${stacking_ids[@]:1}"; do
+            # The layout may lag behind the moves above; re-check a few times
+            # before giving up on stacking this window.
+            for _ in 1 2 3 4; do
+                col="$(column_index_for_id "$first_id")"
+                is_uint "$col" || break
+                right_id="$(right_column_first_id "$workspace_id" "$col")"
+                if [[ "$right_id" == "$id" ]]; then
+                    focus_window_id "$first_id"
+                    niri_action consume-window-into-column || true
+                    break
+                fi
+                sleep 0.1
+            done
+        done
+    fi
+    height=$((100 / ${#stacking_ids[@]}))
     for id in "${stacking_ids[@]}"; do
-        niri_action set-window-height --id "$id" "33%" || true
+        niri_action set-window-height --id "$id" "${height}%" || true
     done
     focus_window_id "$first_id"
 }
