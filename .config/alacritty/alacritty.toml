@@ -1,0 +1,102 @@
+[general]
+working_directory = "None"
+live_config_reload = true
+
+[terminal]
+shell = "/usr/bin/zsh"
+
+[env]
+TERM = "xterm-256color"
+WINIT_X11_SCALE_FACTOR = "1.0"
+
+[window]
+dimensions = { columns = 100, lines = 30 }
+dynamic_padding = true
+decorations = "Full"
+padding = { x = 10, y = 8 }
+opacity = 0.86
+title = "Alacritty@CachyOS"
+class = { instance = "Alacritty", general = "Alacritty" }
+decorations_theme_variant = "Dark"
+
+[scrolling]
+history = 10000
+multiplier = 3
+
+[font]
+normal = { family = "MesloLGS Nerd Font Mono", style = "Regular" }
+bold = { family = "MesloLGS Nerd Font Mono", style = "Bold" }
+italic = { family = "MesloLGS Nerd Font Mono", style = "Italic" }
+bold_italic = { family = "MesloLGS Nerd Font Mono", style = "Bold Italic" }
+size = 14.0
+# ghostty adjust-cell-height=25%: base cell is 48 physical px at scale 2, so +12, glyphs recentered by 6
+offset = { x = 0, y = 12 }
+glyph_offset = { x = 0, y = 6 }
+
+[colors]
+draw_bold_text_with_bright_colors = false
+transparent_background_colors = true
+
+[colors.primary]
+background = "#1b1b1d"
+foreground = "#d7d7d7"
+
+[colors.cursor]
+text = "#1b1b1d"
+cursor = "#d7d7d7"
+
+[colors.selection]
+text = "#ffffff"
+background = "#3f3f44"
+
+[colors.normal]
+black = "#1b1b1d"
+red = "#ff5c57"
+green = "#5af078"
+yellow = "#ffd866"
+blue = "#45c8ff"
+magenta = "#ff40ff"
+cyan = "#45c8ff"
+white = "#d7d7d7"
+
+[colors.bright]
+black = "#5f6368"
+red = "#ff6b66"
+green = "#69ff8a"
+yellow = "#ffe680"
+blue = "#5ad4ff"
+magenta = "#ff66ff"
+cyan = "#5ad4ff"
+white = "#ffffff"
+
+[selection]
+semantic_escape_chars = ",│`|:\"' ()[]{}<>\t"
+save_to_clipboard = true
+
+[cursor]
+style = { shape = "Block", blinking = "Off" }
+unfocused_hollow = true
+
+[mouse]
+hide_when_typing = true
+bindings = [
+{ mouse = "Middle", mods = "None", action = "PasteSelection" },
+]
+
+[keyboard]
+bindings = [
+{ key = "Paste", mods = "None", action = "Paste" },
+{ key = "Copy", mods = "None", action = "Copy" },
+{ key = "L", mods = "Control", action = "ClearLogNotice" },
+{ key = "L", mods = "Control", mode = "~Vi", chars = "\f" },
+{ key = "PageUp", mods = "Shift", mode = "~Alt", action = "ScrollPageUp" },
+{ key = "PageDown", mods = "Shift", mode = "~Alt", action = "ScrollPageDown" },
+{ key = "Home", mods = "Shift", mode = "~Alt", action = "ScrollToTop" },
+{ key = "End", mods = "Shift", mode = "~Alt", action = "ScrollToBottom" },
+{ key = "V", mods = "Control|Shift", action = "Paste" },
+{ key = "C", mods = "Control|Shift", action = "Copy" },
+{ key = "F", mods = "Control|Shift", action = "SearchForward" },
+{ key = "B", mods = "Control|Shift", action = "SearchBackward" },
+{ key = "C", mods = "Control|Shift", mode = "Vi", action = "ClearSelection" },
+{ key = "Key0", mods = "Control", action = "ResetFontSize" },
+]
