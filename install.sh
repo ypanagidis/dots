@@ -4,6 +4,8 @@ set -euo pipefail
 REPO_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 LOCAL_BIN="$HOME/.local/bin"
 NIRI_LINK="$HOME/.config/niri"
+HERDR_DIR="$HOME/.config/herdr"
+HERDR_CONFIG="$HERDR_DIR/config.toml"
 USER_SYSTEMD="$HOME/.config/systemd/user"
 UNIT_NAME="niri-ctx-watch.service"
 UNIT_SRC="$REPO_ROOT/.config/systemd/user/$UNIT_NAME"
@@ -21,6 +23,18 @@ mkdir -p "$LOCAL_BIN"
 chmod +x "$REPO_ROOT/bin/niri-ctx"
 ln -sfn "$REPO_ROOT/bin/niri-ctx" "$LOCAL_BIN/niri-ctx"
 info "linked $LOCAL_BIN/niri-ctx"
+
+mkdir -p "$HERDR_DIR"
+if [[ -e "$HERDR_CONFIG" && ! -L "$HERDR_CONFIG" ]]; then
+    herdr_backup="$HERDR_CONFIG.bak-$(date +%Y%m%d-%H%M%S)"
+    mv "$HERDR_CONFIG" "$herdr_backup"
+    info "backed up $HERDR_CONFIG to $herdr_backup"
+fi
+ln -sfn "$REPO_ROOT/.config/herdr/config.toml" "$HERDR_CONFIG"
+info "linked $HERDR_CONFIG"
+if command -v herdr >/dev/null 2>&1 && pgrep -u "$(id -u)" -x herdr >/dev/null 2>&1; then
+    timeout 5 herdr server reload-config >/dev/null 2>&1 || true
+fi
 
 legacy_names=(
     niri-frontend-mode

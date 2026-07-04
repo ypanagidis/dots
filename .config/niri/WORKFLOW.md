@@ -132,19 +132,29 @@ niri-ctx --tmux-role <ctx> <role>
 
 ## contexts.conf
 
-`.config/niri/contexts.conf` is the source of truth for project directories, browser profiles, outputs, terminal choice, agent backend, and top-display follow behavior.
+`.config/niri/contexts.conf` is the source of truth for project directories, browser profiles, outputs, terminal choice, session backend, and top-display follow behavior.
 
 Expected context directory map:
 
 ```bash
 declare -A CTX_DIR=(
-  [UP]="$HOME/Developer/Work/UP"
-  [Webroot]="$HOME"
-  [Sealant]="$HOME"
-  [Side]="$HOME"
+  [UP]="$HOME/Developer/Work/UP/mono"
+  [Webroot]="$HOME/Developer/Work/Webroot"
+  [Sealant]="$HOME/Developer/OSS/Sealant"
+  [Side]="$HOME"             # TODO: user hasn't placed Side yet
   [Admin]="$HOME"
 )
 ```
+
+Project directory map:
+
+| Context | Directory |
+| --- | --- |
+| UP | `~/Developer/Work/UP/mono` |
+| Webroot | `~/Developer/Work/Webroot` |
+| Sealant | `~/Developer/OSS/Sealant` |
+| Side | `~` TODO |
+| Admin | `~` |
 
 Browser profile map:
 
@@ -168,13 +178,13 @@ HELIUM_BIN="${HELIUM_BIN:-/opt/helium-browser-bin/helium}"
 CONTEXT_TERMINAL="${NIRI_CONTEXT_TERMINAL:-ghostty}"
 ```
 
-Agent backend:
+Session backend:
 
 ```bash
-AGENTS_BACKEND="tmux"
+SESSION_BACKEND="herdr"
 ```
 
-`tmux` is the default. Set `AGENTS_BACKEND="herdr"` only after Herdr is configured. If Herdr fails, the agent card falls back to the tmux session.
+`herdr` is the default for terminal cards. Set `SESSION_BACKEND="tmux"` only to force tmux directly. If Herdr is missing or exits nonzero, the dispatcher falls back to the same tmux session invisibly inside the terminal role process.
 
 Top-display follow behavior:
 
@@ -200,14 +210,31 @@ Each docs/output cache entry is valid only if the window still exists, is `app_i
 
 ## Terminal Sessions
 
-Terminal cards attach to tmux sessions named from the context and role:
+Terminal cards attach to Herdr sessions named from the context and role:
 
 - `<ctx>-dev`
 - `<ctx>-agents`
 - `<ctx>-logs`
 - `<ctx>-terminal`
 
-The editor role starts or attaches the dev session with `nvim` as the initial command. The agents role uses Herdr only when `AGENTS_BACKEND="herdr"` and `herdr` is available; otherwise it uses tmux.
+These are the same names the tmux backend uses. `SESSION_BACKEND="herdr"` is the normal path for every terminal role; tmux remains the fallback when Herdr is unavailable or exits nonzero. The editor role starts `nvim` automatically on fresh Herdr dev sessions; if injection fails, the acceptable fallback is a shell in the project directory.
+
+Herdr keys:
+
+```text
+Ctrl+S         prefix
+prefix+d      detach
+prefix+v      split right (herdr rejects a bare "=" binding)
+prefix+-      split down
+prefix+m      zoom pane
+prefix+u      edit scrollback
+prefix+c      new tab
+prefix+1..9   switch tab
+prefix+p/n    previous/next tab
+prefix+h/j/k/l focus pane left/down/up/right
+```
+
+Herdr supports `herdr integration install claude` and `herdr integration install codex`, but those integrations are not installed by this repo. Opt into them later if you want agent status reporting inside Herdr.
 
 ## Comms
 
@@ -265,7 +292,7 @@ Run:
 niri-ctx doctor
 ```
 
-The doctor checks niri config validation, `NIRI_SOCKET`, expected outputs, project directories, required binaries, optional Spotify and Herdr support, the watcher service, stale legacy browser caches, and whether keybinds reference the installed `niri-ctx` path.
+The doctor checks niri config validation, `NIRI_SOCKET`, expected outputs, project directories, required binaries, optional Spotify support, Herdr backend/config state, the watcher service, stale legacy browser caches, and whether keybinds reference the installed `niri-ctx` path.
 
 ## Troubleshooting
 
@@ -286,7 +313,7 @@ If `DP-2` does not follow browser focus:
 - Check `systemctl --user status niri-ctx-watch.service`.
 - Confirm `NIRI_SOCKET` is set inside the graphical session.
 
-If agents do not start:
+If terminal sessions do not start:
 
-- Keep `AGENTS_BACKEND="tmux"` until Herdr is configured.
+- Set `SESSION_BACKEND="tmux"` to bypass Herdr temporarily.
 - If using Herdr, confirm `command -v herdr` succeeds and `niri-ctx doctor` does not report a backend mismatch.
