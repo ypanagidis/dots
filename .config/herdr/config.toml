@@ -9,7 +9,7 @@ onboarding = false
 # Built-in themes: catppuccin, terminal, tokyo-night, dracula, nord,
 #                  gruvbox, one-dark, solarized, kanagawa, rose-pine,
 #                  vesper
-name = "terminal"        # follow the outer ghostty palette
+name = "terminal"
 
 # Follow host terminal light/dark appearance and switch Herdr UI themes.
 # Existing manual behavior is unchanged unless this is true.
@@ -25,6 +25,7 @@ name = "terminal"        # follow the outer ghostty palette
 # red = "#ff6188"
 # green = "#a6e3a1"
 
+auto_switch = false
 [terminal]
 # Executable used for new interactive panes.
 # Empty means $SHELL, then /bin/sh.
@@ -75,8 +76,8 @@ detach = "prefix+d"           # tmux muscle memory (herdr default was prefix+q)
 # remove_worktree = ""  # optional, unset by default; opens confirmation
 # rename_workspace = "prefix+shift+w"
 # close_workspace = "prefix+shift+d"
-# previous_workspace = "" # optional, unset by default
-# next_workspace = ""     # optional, unset by default
+previous_workspace = "prefix+ctrl+k"  # k=up=prev; ctrl-chord keeps plain j/k for pane focus
+next_workspace = "prefix+ctrl+j"      # j=down=next; only fires after the ctrl+s prefix, so nvim C-j is safe
 # previous_agent = ""     # optional, unset by default
 # next_agent = ""         # optional, unset by default
 # focus_agent = ""        # optional indexed binding, e.g. "prefix+alt+1..9"
@@ -85,7 +86,7 @@ detach = "prefix+d"           # tmux muscle memory (herdr default was prefix+q)
 # rename_tab = "prefix+shift+t"
 # previous_tab = "prefix+p"
 # next_tab = "prefix+n"
-# switch_tab = "prefix+1..9"
+switch_tab = "prefix+1..9"    # role tabs: 1=editor 2=agents 3=logs in every repo workspace
 # switch_workspace = ""   # optional indexed binding, e.g. "prefix+shift+1..9"
 # close_tab = "prefix+shift+x"
 # rename_pane = "prefix+shift+p"

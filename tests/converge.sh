@@ -52,11 +52,29 @@ assert_up_canonical() { # <label>
     done
 }
 
-up_work_focused_role() { # herdr workspace label currently focused in UP-work
-    local sock="$HOME/.config/herdr/sessions/UP-work/herdr.sock"
-    [[ -S "$sock" ]] || { printf 'no-sock\n'; return; }
-    timeout 2 env HERDR_SOCKET_PATH="$sock" herdr workspace list 2>/dev/null \
-        | jq -r 'first(.result.workspaces[]? | select(.focused) | .label) // "none"'
+UP_SOCK="$HOME/.config/herdr/sessions/UP-work/herdr.sock"
+
+up_herdr() { timeout 2 env HERDR_SOCKET_PATH="$UP_SOCK" herdr "$@" 2>/dev/null; }
+
+up_work_focused() { # prints "<focused-workspace-label>/<focused-tab-label>"
+    local wslabel wsid tablabel
+    [[ -S "$UP_SOCK" ]] || { printf 'no-sock\n'; return; }
+    read -r wsid wslabel <<< "$(up_herdr workspace list \
+        | jq -r 'first(.result.workspaces[]? | select(.focused) | "\(.workspace_id) \(.label)") // empty')"
+    [[ -n "${wsid:-}" ]] || { printf 'none\n'; return; }
+    tablabel="$(up_herdr tab list --workspace "$wsid" \
+        | jq -r 'first(.result.tabs[]? | select(.focused) | .label) // "none"')"
+    printf '%s/%s\n' "$wslabel" "$tablabel"
+}
+
+up_work_repo_tabs() { # prints the mono workspace's first three tab labels in order
+    local wsid
+    [[ -S "$UP_SOCK" ]] || { printf 'no-sock\n'; return; }
+    wsid="$(up_herdr workspace list \
+        | jq -r 'first(.result.workspaces[]? | select(.label == "mono") | .workspace_id) // empty')"
+    [[ -n "$wsid" ]] || { printf 'no-mono\n'; return; }
+    up_herdr tab list --workspace "$wsid" \
+        | jq -r '[.result.tabs[]? | {label, number}] | sort_by(.number) | .[0:3] | map(.label) | join(" ")'
 }
 
 say "=== S1: open UP twice is idempotent and canonical ==="
@@ -86,10 +104,17 @@ sleep 1
 check "S3 window count stable" "$(window_count)" "$c1"
 assert_up_canonical S3
 
-say "=== S3b: role deep-links land on the right herdr workspace ==="
+say "=== S3b: repo-major canon — mono workspace holds the role tabs in order ==="
+check "S3b mono tabs editor/agents/logs" "$(up_work_repo_tabs)" "editor agents logs"
+legacy_editor="$(up_herdr workspace list | jq -r '[.result.workspaces[]? | select(.label == "editor")] | length')"
+check "S3b legacy editor workspace migrated away" "$legacy_editor" "0"
+
+say "=== S3c: role deep-links land on the role tab of the current repo ==="
+"$NIRI_CTX" open UP repo:mono >/dev/null; sleep 1
+check "S3c repo:mono focuses mono" "$(up_work_focused | cut -d/ -f1)" "mono"
 for role in agents logs editor; do
     "$NIRI_CTX" open UP "$role" >/dev/null; sleep 1
-    check "S3b deep-link $role" "$(up_work_focused_role)" "$role"
+    check "S3c deep-link $role" "$(up_work_focused)" "mono/$role"
 done
 
 say "=== S4: comms converges from slack exiled to UP ==="

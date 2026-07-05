@@ -84,22 +84,23 @@ binds {
     Mod+CTRL+Shift+WheelScrollDown      { move-column-right; }
     Mod+CTRL+Shift+WheelScrollUp        { move-column-left; }
 
-    CTRL+ALT+Shift+Super+1              hotkey-overlay-title="Open Context: UP" repeat=false { spawn "/home/yiannis/.local/bin/niri-ctx" "open" "UP"; }
+    CTRL+ALT+Shift+Super+1              hotkey-overlay-title="Scratch: browser + terminal" repeat=false { spawn "/home/yiannis/.local/bin/niri-ctx" "scratch"; }
     CTRL+ALT+Shift+Super+2              hotkey-overlay-title="Open Context: Webroot" repeat=false { spawn "/home/yiannis/.local/bin/niri-ctx" "open" "Webroot"; }
-    CTRL+ALT+Shift+Super+3              hotkey-overlay-title="Open Context: Sealant" repeat=false { spawn "/home/yiannis/.local/bin/niri-ctx" "open" "Sealant"; }
-    CTRL+ALT+Shift+Super+4              hotkey-overlay-title="Open Context: Side" repeat=false { spawn "/home/yiannis/.local/bin/niri-ctx" "open" "Side"; }
-    CTRL+ALT+Shift+Super+5              hotkey-overlay-title="Open Context: Admin" repeat=false { spawn "/home/yiannis/.local/bin/niri-ctx" "open" "Admin"; }
+    CTRL+ALT+Shift+Super+3              hotkey-overlay-title="Open Context: UP" repeat=false { spawn "/home/yiannis/.local/bin/niri-ctx" "open" "UP"; }
+    CTRL+ALT+Shift+Super+4              hotkey-overlay-title="Open Context: Sealant" repeat=false { spawn "/home/yiannis/.local/bin/niri-ctx" "open" "Sealant"; }
+    CTRL+ALT+Shift+Super+5              hotkey-overlay-title="Open Context: Side" repeat=false { spawn "/home/yiannis/.local/bin/niri-ctx" "open" "Side"; }
+    CTRL+ALT+Shift+Super+6              hotkey-overlay-title="Open Context: Admin" repeat=false { spawn "/home/yiannis/.local/bin/niri-ctx" "open" "Admin"; }
     Mod+6                               { focus-workspace 6; }
     Mod+7                               { focus-workspace 7; }
     Mod+8                               { focus-workspace 8; }
     Mod+9                               { focus-workspace 9; }
 
-    Mod+CTRL+1                          { move-column-to-workspace "UP"; }
+    Mod+CTRL+1                          { move-column-to-workspace "scratch"; }
     Mod+CTRL+2                          { move-column-to-workspace "Webroot"; }
-    Mod+CTRL+3                          { move-column-to-workspace "Sealant"; }
-    Mod+CTRL+4                          { move-column-to-workspace "Side"; }
-    Mod+CTRL+5                          { move-column-to-workspace "Admin"; }
-    Mod+CTRL+6                          { move-column-to-workspace 6; }
+    Mod+CTRL+3                          { move-column-to-workspace "UP"; }
+    Mod+CTRL+4                          { move-column-to-workspace "Sealant"; }
+    Mod+CTRL+5                          { move-column-to-workspace "Side"; }
+    Mod+CTRL+6                          { move-column-to-workspace "Admin"; }
     Mod+CTRL+7                          { move-column-to-workspace 7; }
     Mod+CTRL+8                          { move-column-to-workspace 8; }
     Mod+CTRL+9                          { move-column-to-workspace 9; }

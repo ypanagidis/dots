@@ -34,6 +34,12 @@
 
     // Context terminal app IDs are set by niri-ctx.
     window-rule {
+        match app-id=r#"^dev\.yiannis\.niri\.scratch\.term$"#
+        open-on-workspace "scratch"
+    }
+
+
+    window-rule {
         match app-id=r#"^dev\.yiannis\.niri\.up\.(work|editor|agents|logs|term)$"#
         open-on-workspace "UP"
     }

@@ -1,11 +1,16 @@
 // ────────────── Niri Developer Workflow Workspaces ──────────────
 // Output names verified with `niri msg outputs` on 2026-07-02.
 
-workspace "UP" {
+// Declaration order = workspace order on the output.
+workspace "scratch" {
     open-on-output "DP-1"
 }
 
 workspace "Webroot" {
+    open-on-output "DP-1"
+}
+
+workspace "UP" {
     open-on-output "DP-1"
 }
 
