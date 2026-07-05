@@ -74,4 +74,5 @@ pub trait NiriClient {
         matcher: &WindowMatcher,
         timeout: Duration,
     ) -> Result<Option<Window>>;
+    fn note_spawn(&mut self, _app_id: &str, _title: &str) {}
 }

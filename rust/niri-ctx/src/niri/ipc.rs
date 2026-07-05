@@ -8,7 +8,7 @@ use std::time::{Duration, Instant};
 use serde::Deserialize;
 
 use crate::error::{NiriCtxError, Result};
-use crate::model::{WindowId, WindowMatcher, WorkspaceId};
+use crate::model::{WindowId, WindowMatcher, WorkspaceId, WorkspaceRef};
 
 use super::{NiriAction, NiriClient, Window, Workspace};
 
@@ -53,13 +53,21 @@ impl NiriClient for IpcNiriClient {
         }
     }
 
-    fn action(&mut self, _action: NiriAction) -> Result<()> {
-        Err(NiriCtxError::ReadOnlyEffect(Box::new(
-            crate::planner::Effect::Log {
-                level: "error".to_string(),
-                msg: "direct IPC actions are disabled in Phase 1".to_string(),
-            },
-        )))
+    fn action(&mut self, action: NiriAction) -> Result<()> {
+        if let NiriAction::FocusWorkspace { reference } = &action {
+            if focus_workspace_already_satisfied(self, reference)? {
+                tracing::debug!(?reference, "skipping live-satisfied focus workspace");
+                return Ok(());
+            }
+        }
+        let ipc_action = to_ipc_action(action)?;
+        tracing::info!(?ipc_action, "niri action");
+        match request(niri_ipc::Request::Action(ipc_action))? {
+            niri_ipc::Response::Handled => Ok(()),
+            response => Err(NiriCtxError::Ipc(format!(
+                "unexpected Action response: {response:?}"
+            ))),
+        }
     }
 
     fn wait_for_window(
@@ -107,6 +115,70 @@ impl NiriClient for IpcNiriClient {
             }
         }
         Ok(None)
+    }
+}
+
+fn focus_workspace_already_satisfied(
+    client: &mut IpcNiriClient,
+    reference: &WorkspaceRef,
+) -> Result<bool> {
+    let workspaces = client.workspaces()?;
+    let focused = workspaces.iter().find(|workspace| workspace.is_focused);
+    let satisfied = match reference {
+        WorkspaceRef::Name(name) => focused
+            .and_then(|workspace| workspace.name.as_deref())
+            .is_some_and(|focused_name| focused_name.eq_ignore_ascii_case(name)),
+        WorkspaceRef::Id(id) => focused.is_some_and(|workspace| workspace.id == *id),
+        WorkspaceRef::Index(_) => false,
+    };
+    Ok(satisfied)
+}
+
+fn to_ipc_action(action: NiriAction) -> Result<niri_ipc::Action> {
+    Ok(match action {
+        NiriAction::FocusOutput { output } => niri_ipc::Action::FocusMonitor { output },
+        NiriAction::FocusWorkspace { reference } => niri_ipc::Action::FocusWorkspace {
+            reference: to_workspace_reference(reference)?,
+        },
+        NiriAction::FocusWindow { id } => niri_ipc::Action::FocusWindow { id: id.0 },
+        NiriAction::MoveWindowToWorkspace {
+            window_id,
+            reference,
+            focus,
+        } => niri_ipc::Action::MoveWindowToWorkspace {
+            window_id: Some(window_id.0),
+            reference: to_workspace_reference(reference)?,
+            focus,
+        },
+        NiriAction::MoveColumnToIndex { index } => niri_ipc::Action::MoveColumnToIndex { index },
+        NiriAction::MoveWorkspaceToIndex { reference, index } => {
+            niri_ipc::Action::MoveWorkspaceToIndex {
+                reference: reference.map(to_workspace_reference).transpose()?,
+                index,
+            }
+        }
+        NiriAction::ExpelWindowFromColumn => niri_ipc::Action::ExpelWindowFromColumn {},
+        NiriAction::ConsumeWindowIntoColumn => niri_ipc::Action::ConsumeWindowIntoColumn {},
+        NiriAction::SetColumnWidth { change } => niri_ipc::Action::SetColumnWidth { change },
+        NiriAction::SetWindowHeight { id, change } => niri_ipc::Action::SetWindowHeight {
+            id: id.map(|id| id.0),
+            change,
+        },
+    })
+}
+
+fn to_workspace_reference(reference: WorkspaceRef) -> Result<niri_ipc::WorkspaceReferenceArg> {
+    match reference {
+        WorkspaceRef::Name(name) => Ok(niri_ipc::WorkspaceReferenceArg::Name(name)),
+        WorkspaceRef::Id(id) => Ok(niri_ipc::WorkspaceReferenceArg::Id(id.0)),
+        WorkspaceRef::Index(index) => {
+            let index = u8::try_from(index).map_err(|_| {
+                NiriCtxError::Ipc(format!(
+                    "workspace index {index} is outside niri's u8 range"
+                ))
+            })?;
+            Ok(niri_ipc::WorkspaceReferenceArg::Index(index))
+        }
     }
 }
 
