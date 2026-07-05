@@ -606,7 +606,10 @@ pub fn focus_workspace_guarded(state: &DesktopState, output: &str, workspace: &s
             output: output.to_string(),
         });
     }
-    if state.active_workspace_name_on_output(output) != Some(workspace) {
+    let active_matches = state
+        .active_workspace_name_on_output(output)
+        .is_some_and(|active| active.eq_ignore_ascii_case(workspace));
+    if !active_matches {
         effects.push(Effect::FocusWorkspace {
             output: output.to_string(),
             ws: WorkspaceRef::name(workspace),
@@ -670,6 +673,12 @@ fn arrange_comms(present: &[(&CommsAppConfig, &Window)]) -> Vec<Effect> {
         .len()
         == 1;
     if all_same_column {
+        // Bash reapplies equal heights on every comms run even when the stack
+        // shape is already right. To stay convergent (empty plan when settled)
+        // we only re-emit heights when the observed tile heights are unequal
+        // beyond tolerance; app min-height constraints get best-effort
+        // treatment in the converge loop rather than a hard failure.
+        effects.extend(equalize_heights_if_unequal(present));
         if let Some((_app, first)) = present.first() {
             if !first.is_focused {
                 effects.push(Effect::FocusWindow { id: first.id });
@@ -698,6 +707,34 @@ fn arrange_comms(present: &[(&CommsAppConfig, &Window)]) -> Vec<Effect> {
         });
     }
     effects
+}
+
+/// Emit SetWindowHeight for a settled comms stack whose tile heights drifted
+/// apart (e.g. a manually resized window) by more than 5% relative spread.
+fn equalize_heights_if_unequal(present: &[(&CommsAppConfig, &Window)]) -> Vec<Effect> {
+    if present.len() < 2 {
+        return Vec::new();
+    }
+    let heights: Vec<f64> = present
+        .iter()
+        .filter_map(|(_app, window)| window.tile_height)
+        .collect();
+    if heights.len() != present.len() {
+        return Vec::new();
+    }
+    let max = heights.iter().cloned().fold(f64::MIN, f64::max);
+    let min = heights.iter().cloned().fold(f64::MAX, f64::min);
+    if max <= 0.0 || (max - min) / max <= 0.05 {
+        return Vec::new();
+    }
+    let height = 100.0 / present.len() as f64;
+    present
+        .iter()
+        .map(|(_app, window)| Effect::SetWindowHeight {
+            id: window.id,
+            change: SizeChange::SetProportion(height),
+        })
+        .collect()
 }
 
 fn launch_fail(app: &CommsAppConfig) -> LaunchFailure {
@@ -771,6 +808,7 @@ mod tests {
             is_focused: focused,
             is_floating: false,
             column,
+            tile_height: Some(500.0),
         }
     }
 
@@ -1061,6 +1099,51 @@ mod tests {
             ],
             "{effects:#?}"
         );
+    }
+
+    #[test]
+    fn comms_stacked_but_unequal_heights_reequalizes() {
+        let cfg = cfg();
+        let mut windows = vec![
+            win(8, "org.telegram.desktop", 4, false, Some((1, 2))),
+            win(10, "slack", 4, false, Some((1, 1))),
+            win(11, "discord", 4, true, Some((1, 3))),
+        ];
+        // slack manually resized much taller than the others
+        for window in &mut windows {
+            window.tile_height = Some(if window.app_id == "slack" {
+                900.0
+            } else {
+                300.0
+            });
+        }
+        let state = DesktopState::new(comms_focused_workspaces(), windows);
+        let effects = plan(&cfg, &state, &Goal::Comms).expect("plan");
+        let heights = effects
+            .iter()
+            .filter(|effect| matches!(effect, Effect::SetWindowHeight { .. }))
+            .count();
+        assert_eq!(heights, 3, "{effects:#?}");
+
+        // equal heights => settled, no plan
+        let mut windows = vec![
+            win(8, "org.telegram.desktop", 4, false, Some((1, 2))),
+            win(10, "slack", 4, true, Some((1, 1))),
+            win(11, "discord", 4, false, Some((1, 3))),
+        ];
+        for window in &mut windows {
+            window.tile_height = Some(480.0);
+        }
+        let state = DesktopState::new(comms_focused_workspaces(), windows);
+        let effects = plan(&cfg, &state, &Goal::Comms).expect("plan");
+        assert!(effects.is_empty(), "{effects:#?}");
+    }
+
+    fn comms_focused_workspaces() -> Vec<Workspace> {
+        vec![
+            ws(1, "UP", "DP-1", true, false),
+            ws(4, "comms", "HDMI-A-1", true, true),
+        ]
     }
 
     #[test]

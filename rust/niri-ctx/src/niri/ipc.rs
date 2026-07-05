@@ -13,7 +13,7 @@ use crate::model::{WindowId, WindowMatcher, WorkspaceId, WorkspaceRef};
 
 use super::{NiriAction, NiriClient, Window, Workspace};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) enum WatchEvent {
     WorkspacesChanged(Vec<Workspace>),
     WindowsChanged(Vec<Window>),
@@ -416,6 +416,10 @@ impl From<niri_ipc::Window> for Window {
             is_focused: raw.is_focused,
             is_floating: raw.is_floating,
             column: raw.layout.pos_in_scrolling_layout,
+            tile_height: raw
+                .layout
+                .pos_in_scrolling_layout
+                .map(|_| raw.layout.tile_size.1),
         }
     }
 }

@@ -194,9 +194,19 @@ impl<'a> Executor<'a> {
                     self.last_window = Some(window);
                     return Ok(());
                 }
+                // The kill-by-class + retry self-heal is TERMINAL-only (Bash
+                // parity): browsers/comms/spotify have no class-marked argv to
+                // kill, and respawning them risks duplicate windows if the
+                // first instance maps late. They fail loudly instead.
+                if !matches!(self.last_spawn, Some(LastSpawn::Terminal { .. })) {
+                    return Err(self.launch_failure(on_fail, *timeout)?);
+                }
                 tracing::info!(?matcher, ?timeout, "wait timed out; retrying launch once");
                 self.self_heal_after_timeout(on_fail)?;
                 let Some(window) = self.client.wait_for_window(matcher, *timeout)? else {
+                    // Bash also reaps the SECOND windowless instance so a hung
+                    // terminal + orphan herdr session can't poison later spawns.
+                    self.cleanup_failed_terminal();
                     return Err(self.launch_failure(on_fail, *timeout)?);
                 };
                 self.last_window = Some(window);
@@ -281,6 +291,25 @@ impl<'a> Executor<'a> {
         Ok(())
     }
 
+    fn cleanup_failed_terminal(&mut self) {
+        if let Some(process) = &self.last_process {
+            if let Err(err) = self.launcher.kill_class_marked(&process.app_id) {
+                tracing::warn!(%err, "failed to kill hung terminal after final timeout");
+            }
+        }
+        if let Some(LastSpawn::Terminal {
+            session: Some(session),
+            session_was_fresh: true,
+            ..
+        }) = &self.last_spawn
+        {
+            let session = session.clone();
+            if let Err(err) = self.sessions.reap_fresh_session(&session) {
+                tracing::warn!(%err, session, "failed to reap fresh session after final timeout");
+            }
+        }
+    }
+
     fn launch_failure(
         &mut self,
         on_fail: &crate::model::LaunchFailure,
@@ -316,14 +345,15 @@ impl<'a> Executor<'a> {
 }
 
 pub fn focus_only(effects: &[Effect]) -> Vec<Effect> {
+    // Bash recovery only re-focused the target workspace; FocusWindow is
+    // excluded so a lock-busy invocation never fights the lock holder over
+    // window focus.
     effects
         .iter()
         .filter(|effect| {
             matches!(
                 effect,
-                Effect::FocusOutput { .. }
-                    | Effect::FocusWorkspace { .. }
-                    | Effect::FocusWindow { .. }
+                Effect::FocusOutput { .. } | Effect::FocusWorkspace { .. }
             )
         })
         .cloned()

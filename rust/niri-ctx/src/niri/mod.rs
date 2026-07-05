@@ -17,7 +17,7 @@ pub struct Workspace {
     pub is_focused: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct Window {
     pub id: WindowId,
     pub title: String,
@@ -27,6 +27,8 @@ pub struct Window {
     pub is_focused: bool,
     pub is_floating: bool,
     pub column: Option<(usize, usize)>,
+    /// Tile height in logical px when tiled; used to detect unequal comms stacks.
+    pub tile_height: Option<f64>,
 }
 
 #[allow(dead_code)]

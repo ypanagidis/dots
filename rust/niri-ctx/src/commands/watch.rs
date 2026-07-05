@@ -526,6 +526,7 @@ mod tests {
             is_focused: focused,
             is_floating: false,
             column: None,
+            tile_height: Some(500.0),
         }
     }
 

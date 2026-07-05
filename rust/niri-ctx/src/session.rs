@@ -435,6 +435,12 @@ fn herdr_sock_json(sock: &Path, args: &[&str]) -> Result<serde_json::Value> {
     command.env("HERDR_SOCKET_PATH", sock);
     let output = run_timeout(&mut command, Duration::from_secs(2))?;
     if !output.status.success() || output.stdout.is_empty() {
+        tracing::warn!(
+            ?args,
+            status = ?output.status,
+            stderr = %String::from_utf8_lossy(&output.stderr),
+            "herdr socket call failed; treating as no-op"
+        );
         return Ok(serde_json::Value::Null);
     }
     serde_json::from_slice(&output.stdout).map_err(Into::into)
@@ -453,7 +459,7 @@ fn run_timeout(command: &mut Command, timeout: Duration) -> Result<std::process:
     command.stdin(Stdio::null());
     let mut child = command
         .stdout(Stdio::piped())
-        .stderr(Stdio::null())
+        .stderr(Stdio::piped())
         .spawn()
         .map_err(|source| NiriCtxError::io("process", source))?;
     let deadline = Instant::now() + timeout;

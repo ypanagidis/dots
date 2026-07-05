@@ -30,7 +30,7 @@ use crate::lock::{GlobalLock, LockAttempt};
 use crate::model::Role;
 use crate::niri::ipc::IpcNiriClient;
 use crate::niri::NiriClient;
-use crate::planner::{plan, resolve_context_arg, Goal};
+use crate::planner::{plan, resolve_context_arg, Effect, Goal};
 use crate::session::{NoopSessionBackend, RealSessionBackend, SessionBackend};
 use crate::state::DesktopState;
 
@@ -133,9 +133,30 @@ fn run_mutating_loop(cfg: &Config, goal: &Goal, command: &str) -> Result<()> {
     let mut client = IpcNiriClient::new();
     let mut launcher = ProcessLauncher;
     let mut sessions = RealSessionBackend::from_config(cfg);
+    // Resolve `current` ONCE, like Bash did before locking: focus can move
+    // between convergence iterations (focus-follows-mouse, spawned windows)
+    // and the command must not retarget to a different context mid-run.
+    let goal = match goal {
+        Goal::Open {
+            ctx: crate::model::ContextArg::Current,
+            role,
+        } => {
+            let state = snapshot_state_with_client(cfg, &mut client)?;
+            let ctx = crate::planner::resolve_context_arg(
+                cfg,
+                &state,
+                crate::model::ContextArg::Current,
+            )?;
+            Goal::Open {
+                ctx: crate::model::ContextArg::Context(ctx),
+                role: role.clone(),
+            }
+        }
+        other => other.clone(),
+    };
     converge_loop(
         cfg,
-        goal,
+        &goal,
         command,
         &mut client,
         &mut launcher,
@@ -163,6 +184,19 @@ pub fn converge_loop(
         remaining = effects.clone();
         Executor::new(cfg, ExecutorMode::Live, client, launcher, sessions).run(&effects)?;
     }
+    // Height equalization is best-effort: an app's min-height constraint can
+    // make exactly-equal tiles unreachable. Don't fail the whole command over
+    // residue that is only SetWindowHeight.
+    if remaining
+        .iter()
+        .all(|effect| matches!(effect, Effect::SetWindowHeight { .. }))
+    {
+        tracing::warn!(
+            ?remaining,
+            "converged with best-effort height residue (app size constraints?)"
+        );
+        return Ok(cfg.behavior.converge_iters);
+    }
     Err(NiriCtxError::NoConverge {
         command: command.to_string(),
         iterations: cfg.behavior.converge_iters,
@@ -171,6 +205,12 @@ pub fn converge_loop(
 }
 
 fn run_focus_only_recovery(cfg: &Config, goal: &Goal) -> Result<()> {
+    // Bash returns immediately for lock-busy devtools-here — moving the
+    // focused window is exactly what a concurrent dispatcher must not race.
+    if matches!(goal, Goal::DevtoolsHere) {
+        tracing::info!("lock busy; devtools-here is a no-op");
+        return Ok(());
+    }
     tracing::info!(?goal, "lock busy; running focus-only recovery");
     let mut client = IpcNiriClient::new();
     let mut launcher = ProcessLauncher;
@@ -409,6 +449,7 @@ mod tests {
             is_focused: focused,
             is_floating: false,
             column,
+            tile_height: Some(500.0),
         }
     }
 
@@ -555,9 +596,10 @@ mod tests {
         let temp = tempfile::tempdir().expect("tempdir");
         set_cache_dir(&temp);
         let cfg = cfg();
+        // The kill+retry self-heal is TERMINAL-only; use the work-card role.
         let goal = Goal::Open {
             ctx: ContextArg::Context(Context::UP),
-            role: Role::Docs,
+            role: Role::Editor,
         };
 
         let mut alive_client = FakeNiriClient::new(base_workspaces(), vec![]);
@@ -594,6 +636,37 @@ mod tests {
         )
         .expect_err("exited launch should fail");
         assert!(err.to_string().contains("process exited with code 7"));
+    }
+
+    #[test]
+    fn browser_spawn_never_maps_fails_without_retry() {
+        let _guard = ENV_LOCK.lock().unwrap_or_else(|err| err.into_inner());
+        let temp = tempfile::tempdir().expect("tempdir");
+        set_cache_dir(&temp);
+        let cfg = cfg();
+        let goal = Goal::Open {
+            ctx: ContextArg::Context(Context::UP),
+            role: Role::Docs,
+        };
+        let mut client = FakeNiriClient::new(base_workspaces(), vec![]);
+        client.map_spawns = false;
+        client.wait_never_maps = true;
+        let mut launcher = FakeLauncher::default();
+        let mut sessions = FakeSessionBackend::default();
+        let err = converge_loop(
+            &cfg,
+            &goal,
+            "open",
+            &mut client,
+            &mut launcher,
+            &mut sessions,
+        )
+        .expect_err("browser launch should fail");
+        assert!(err.to_string().contains("never appeared"), "{err}");
+        // No kill-by-class + respawn for browsers: a late-mapping first
+        // instance must not be duplicated.
+        assert_eq!(launcher.spawns.len(), 1);
+        assert!(launcher.kills.is_empty());
     }
 
     #[test]

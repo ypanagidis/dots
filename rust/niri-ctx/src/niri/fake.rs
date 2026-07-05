@@ -271,6 +271,7 @@ impl NiriClient for FakeNiriClient {
             is_focused: true,
             is_floating: false,
             column: Some((column, 1)),
+            tile_height: Some(500.0),
         });
     }
 }
