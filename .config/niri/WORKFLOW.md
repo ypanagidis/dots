@@ -6,289 +6,212 @@ This setup is driven by one dispatcher:
 /home/yiannis/.local/bin/niri-ctx
 ```
 
-The niri config lives in this repo, and `~/.config/niri` is expected to point here. Project-specific settings are in `.config/niri/contexts.conf`; keybindings call `niri-ctx`, while window rules handle stable placement.
+Since 2026-07-05 that is a symlink to the **Rust dispatcher**
+(`rust/niri-ctx/target/release/niri-ctx`, built by `install.sh`). The original
+Bash implementation stays at `bin/niri-ctx`: it is the instant rollback
+(`./install.sh --bash`) and still owns the in-terminal session attach
+(`--tmux-role`), which the Rust dispatcher execs.
 
-## Monitors
+The niri config lives in this repo, and `~/.config/niri` is expected to point
+here. Project-specific settings are in `.config/niri/contexts.conf` — the Rust
+dispatcher derives its config from it live (plus optional Rust-only overrides
+in `~/.config/niri-ctx/config.toml`), so one file drives both implementations.
+Keybindings call `niri-ctx`; window rules handle stable placement.
 
-- `DP-1`: main work display.
-- `DP-2`: top display for `top-ambient` and project DevTools workspaces.
-- `HDMI-A-1`: comms display.
+## The mental model
 
-Startup runs:
+- `DP-1` (main): the **context carousel** — one workspace per job/project.
+- `DP-2` (top): ambient (`top-ambient`, Spotify) or a context's devtools.
+- `HDMI-A-1` (vertical): static comms — Slack, Telegram, Discord.
+- A context = **two full-screen-ish cards**: docs browser (column 1) + one
+  work terminal (column 2). Editor/agents/logs live INSIDE the work terminal
+  as herdr tabs, one herdr workspace per repo. An output browser is on-demand.
 
-```sh
-niri-ctx startup
-```
+## Monitors and startup
 
-That waits until niri has the `UP` workspace on `DP-1`, then focuses it without triggering workspace back-and-forth.
+- `DP-1`: 5120x2880, main work display.
+- `DP-2`: top display for `top-ambient` and per-context devtools workspaces.
+- `HDMI-A-1`: rotated comms display.
+
+Autostart runs `niri-ctx startup`, which waits until niri has the `UP`
+workspace on `DP-1`, then focuses it without triggering workspace
+back-and-forth.
 
 ## Workspaces
 
-Project workspaces on `DP-1`:
+`DP-1`: `scratch`, `Webroot`, `UP`, `Sealant`, `Side`, `Admin`
+`DP-2`: `top-ambient`, `UP-devtools`, `Webroot-devtools`, `Sealant-devtools`, `Side-devtools`
+`HDMI-A-1`: `comms`
 
-- `UP`
-- `Webroot`
-- `Sealant`
-- `Side`
-- `Admin`
-
-Top workspaces on `DP-2`:
-
-- `top-ambient`
-- `UP-devtools`
-- `Webroot-devtools`
-- `Sealant-devtools`
-- `Side-devtools`
-
-Comms workspace on `HDMI-A-1`:
-
-- `comms`
+`Admin` deliberately has no devtools workspace. `scratch` is a pseudo-context:
+helium plus a plain terminal, no herdr session.
 
 ## Hotkeys
 
-Hyper on this keyboard emits `CTRL+ALT+Shift+Super`. Because Shift is already part of Hyper, `Hyper+Shift+...` is not a distinct binding shape.
+Hyper on this keyboard emits `CTRL+ALT+Shift+Super`.
 
-- `Hyper+1`: `niri-ctx open UP`
+- `Hyper+1`: `niri-ctx scratch`
 - `Hyper+2`: `niri-ctx open Webroot`
-- `Hyper+3`: `niri-ctx open Sealant`
-- `Hyper+4`: `niri-ctx open Side`
-- `Hyper+5`: `niri-ctx open Admin`
+- `Hyper+3`: `niri-ctx open UP`
+- `Hyper+4`: `niri-ctx open Sealant`
+- `Hyper+5`: `niri-ctx open Side`
+- `Hyper+6`: `niri-ctx open Admin`
 - `Hyper+A`: `niri-ctx open current docs`
 - `Hyper+G`: `niri-ctx open current editor`
 - `Hyper+C`: `niri-ctx open current agents`
-- `Hyper+R`: `niri-ctx open current agents` (same as `Hyper+C`; the `term` role exists but is unbound)
+- `Hyper+R`: `niri-ctx open current agents` (duplicate of `Hyper+C`, kept deliberately for now)
 - `Hyper+T`: `niri-ctx spotify`
 - `Hyper+Escape`: `niri-ctx top-ambient`
 - `Hyper+V`: `niri-ctx comms`
 - `Hyper+D`: `niri-ctx devtools-here`
-- `Hyper+Left` / `Hyper+H`: focus previous card.
-- `Hyper+Right` / `Hyper+L`: focus next card.
-- `Hyper+Up` / `Hyper+K`: focus workspace above.
-- `Hyper+Down` / `Hyper+J`: focus workspace below.
-- `Hyper+[` / `Hyper+]`: focus monitor left/right.
-- `Hyper+Page_Up` / `Hyper+Page_Down`: focus monitor up/down.
+- `Hyper+Left/Right` (`H`/`L`): focus previous/next card.
+- `Hyper+Up/Down` (`K`/`J`): focus workspace above/below.
+- `Hyper+[` / `Hyper+]`: focus monitor left/right; `Hyper+Page_Up/Down` up/down.
 
-Layout controls that remain on `Mod`:
+Layout controls on `Mod`: `Mod+Ctrl+R` preset widths, `Mod+Ctrl+M` maximize
+column, `Mod+M` maximize to edges, `Mod+Shift+M` fullscreen, `Mod+W` tabbed
+column.
 
-- `Mod+Ctrl+R`: cycle preset column widths.
-- `Mod+Ctrl+M`: maximize column.
-- `Mod+M`: maximize window to edges.
-- `Mod+Shift+M`: fullscreen window.
-- `Mod+W`: toggle tabbed column display.
-
-## Card Order
-
-`niri-ctx open <context>` guarantees the project card order after it has created or found the required windows:
-
-1. Docs browser
-2. Editor terminal
-3. Agents terminal
-4. Output browser
-5. Logs terminal
-
-`Admin` is smaller and opens docs plus a normal terminal. The dispatcher orders columns by window id after all target cards exist; it does not rely on spawn timing. Focus ends on the project workspace on `DP-1`, with the docs browser focused for full context opens.
-
-## Window Placement
-
-Project terminals are placed declaratively by app-id rules. The dispatcher starts terminals with app IDs like:
-
-```text
-dev.yiannis.niri.up.editor
-dev.yiannis.niri.webroot.agents
-dev.yiannis.niri.sealant.logs
-dev.yiannis.niri.side.term
-dev.yiannis.niri.admin.term
-```
-
-Rules match `dev.yiannis.niri.<slug>.(editor|agents|logs|term)` and open those windows on the matching project workspace. The script then focuses the window by id.
-
-Comms apps are matched by anchored app IDs:
-
-- Slack: `slack`
-- Discord: `discord`
-- Telegram: `org.telegram.desktop`
-
-Spotify is matched as `Spotify` and opens on `top-ambient`.
-
-## Dispatcher Commands
-
-Supported `niri-ctx` commands:
+## Dispatcher commands
 
 ```sh
-niri-ctx open <UP|Webroot|Sealant|Side|Admin|current> [all|docs|output|editor|agents|logs|term]
+niri-ctx open <UP|Webroot|Sealant|Side|Admin|current> [all|docs|output|editor|agents|logs|term|repo:<label>]
+niri-ctx scratch
 niri-ctx comms
-niri-ctx devtools-here
-niri-ctx top-ambient
 niri-ctx spotify
-niri-ctx watch
+niri-ctx top-ambient
+niri-ctx devtools-here
 niri-ctx startup
-niri-ctx doctor
-niri-ctx --tmux-role <ctx> <role>
+niri-ctx watch
+niri-ctx doctor [--json]
+niri-ctx --tmux-role <ctx> <role>       # internal: in-terminal session attach
+
+# New with the Rust dispatcher:
+niri-ctx current                        # print the inferred context
+niri-ctx inspect [--json]               # dump desktop state + resolved config
+niri-ctx plan <command...>              # show what a command WOULD do
+niri-ctx --dry-run <command...>         # same, for any mutating command
+niri-ctx init-config                    # freeze derived config to config.toml
 ```
 
-`current` is inferred from the focused project workspace, with the active main-output project workspace as fallback.
+Context aliases: `job1`→UP, `job2`→Webroot, `side1`→Sealant, `side2`→Side
+(case-insensitive). `current` is inferred from the focused workspace
+(`-devtools` suffix stripped), falling back to the active workspace on `DP-1`.
+
+Every command **converges**: it drives the desktop to the canonical state from
+any starting layout (verified by `tests/converge.sh`). Running a command twice
+is always safe; a settled state plans zero actions.
+
+## Cards and placement
+
+`niri-ctx open <ctx>` guarantees: docs browser at column 1, work terminal at
+column 2, both on the context workspace, focus ending on the docs card.
+Drifted cards are moved back; stacked cards are expelled apart.
+
+Work terminals carry app-id `dev.yiannis.niri.<slug>.work` (scratch:
+`dev.yiannis.niri.scratch.term`); rules.kdl places them declaratively (rules
+still also match the legacy per-role ids for old windows). Comms apps are
+matched by anchored app IDs: Slack `slack`, Discord `discord`, Telegram
+`org.telegram.desktop`. Spotify is `Spotify` and lives on `top-ambient`.
+
+Browser cards are tracked by cache files under
+`${XDG_CACHE_HOME:-$HOME/.cache}/niri-ctx/` (window id + compositor socket;
+entries are invalidated on compositor restart or window death, and a fresh
+card is spawned and re-cached automatically).
+
+## Terminal sessions (herdr, repo-major)
+
+Each context has ONE herdr session, `<Ctx>-work`. Inside it:
+
+- one herdr **workspace per repo** (from `CTX_REPOS`, first entry = default),
+- tabs `editor` / `agents` / `logs` in that order inside each repo workspace,
+  so `prefix+1/2/3` is uniform everywhere,
+- the editor tab runs `nvim`.
+
+Role deep-links (`open <ctx> agents` etc.) act on the currently focused repo
+workspace, falling back to the default repo; `open <ctx> repo:<label>`
+focuses/creates a repo workspace. `Admin` is one plain `term` workspace.
+
+tmux is the invisible fallback (`SESSION_BACKEND="tmux"` to force): same
+session name, windows named `<repo>/<role>`.
+
+Herdr keys: `Ctrl+S` prefix; `prefix+d` detach, `prefix+v`/`prefix+-` splits,
+`prefix+m` zoom, `prefix+u` scrollback, `prefix+c` new tab, `prefix+1..9`
+switch tab, `prefix+h/j/k/l` pane focus.
 
 ## contexts.conf
 
-`.config/niri/contexts.conf` is the source of truth for project directories, browser profiles, outputs, terminal choice, session backend, and top-display follow behavior.
-
-Expected context directory map:
+Source of truth for repos, profiles, outputs, terminal, backend, top-follow:
 
 ```bash
-declare -A CTX_DIR=(
-  [UP]="$HOME/Developer/Work/UP/mono"
-  [Webroot]="$HOME/Developer/Work/Webroot"
-  [Sealant]="$HOME/Developer/OSS/Sealant"
-  [Side]="$HOME"             # TODO: user hasn't placed Side yet
-  [Admin]="$HOME"
-)
-```
+CTX_REPOS[UP]="mono=$HOME/Developer/Work/UP/mono"
+CTX_REPOS[Webroot]="webroot=$HOME/Developer/Work/Webroot"
+CTX_REPOS[Sealant]="core=$HOME/Developer/OSS/Sealant/Core sealantd=$HOME/Developer/OSS/Sealant/Sealantd"
+CTX_REPOS[Side]="sandbox=$HOME/Developer/sandbox"
+CTX_REPOS[Admin]="term=$HOME"
 
-Project directory map:
+CTX_HELIUM_PROFILE=( [UP]="Profile 1" [Webroot]="Profile 3" ... )
 
-| Context | Directory |
-| --- | --- |
-| UP | `~/Developer/Work/UP/mono` |
-| Webroot | `~/Developer/Work/Webroot` |
-| Sealant | `~/Developer/OSS/Sealant` |
-| Side | `~` TODO |
-| Admin | `~` |
-
-Browser profile map:
-
-```bash
-declare -A CTX_HELIUM_PROFILE=(
-  [UP]="Profile 1"
-  [Webroot]="Profile 3"
-  [Sealant]="Default"
-  [Side]="Default"
-  [Admin]="Default"
-)
-```
-
-Output and binary settings:
-
-```bash
-MAIN_OUTPUT="DP-1"
-TOP_OUTPUT="DP-2"
-COMMS_OUTPUT="HDMI-A-1"
+MAIN_OUTPUT="DP-1"  TOP_OUTPUT="DP-2"  COMMS_OUTPUT="HDMI-A-1"
 HELIUM_BIN="${HELIUM_BIN:-/opt/helium-browser-bin/helium}"
 CONTEXT_TERMINAL="${NIRI_CONTEXT_TERMINAL:-ghostty}"
-```
-
-Session backend:
-
-```bash
 SESSION_BACKEND="herdr"
-```
-
-`herdr` is the default for terminal cards. Set `SESSION_BACKEND="tmux"` only to force tmux directly. If Herdr is missing or exits nonzero, the dispatcher falls back to the same tmux session invisibly inside the terminal role process.
-
-Top-display follow behavior:
-
-```bash
 TOP_FOLLOW="off"
 ```
 
-`DP-2` auto-switching is DISABLED (2026-07-04): the top display changes only via
-`Hyper+Escape` (ambient) or `Hyper+D` (move a window to devtools). To opt back in,
-set `TOP_FOLLOW` to `devtools` or `ambient` and enable the watch service by hand
-(see install.sh comments); `devtools` switches `DP-2` to the focused project's
-DevTools workspace when a project browser card gains focus, `ambient` additionally
-returns `DP-2` to `top-ambient` on non-browser focus.
-
-## Browser Cards
-
-Helium cards are tracked by cache files under:
-
-```text
-${XDG_CACHE_HOME:-$HOME/.cache}/niri-ctx/
-```
-
-Each cache entry stores the window id plus the compositor socket it belongs to; it is valid only if that socket matches the running compositor and the window still exists as `app_id == "helium"`. A valid card that drifted to another workspace is moved back to its context workspace on the next open. Stale entries are removed automatically.
-
-## Terminal Sessions
-
-Terminal cards attach to Herdr sessions named from the context and role:
-
-- `<ctx>-dev`
-- `<ctx>-agents`
-- `<ctx>-logs`
-- `<ctx>-terminal`
-
-These are the same names the tmux backend uses. `SESSION_BACKEND="herdr"` is the normal path for every terminal role; tmux remains the fallback when Herdr is unavailable or exits nonzero. The editor role starts `nvim` automatically on fresh Herdr dev sessions; if injection fails, the acceptable fallback is a shell in the project directory.
-
-Herdr keys:
-
-```text
-Ctrl+S         prefix
-prefix+d      detach
-prefix+v      split right (herdr rejects a bare "=" binding)
-prefix+-      split down
-prefix+m      zoom pane
-prefix+u      edit scrollback
-prefix+c      new tab
-prefix+1..9   switch tab
-prefix+p/n    previous/next tab
-prefix+h/j/k/l focus pane left/down/up/right
-```
-
-Herdr supports `herdr integration install claude` and `herdr integration install codex`, but those integrations are not installed by this repo. Opt into them later if you want agent status reporting inside Herdr.
+Paths in `CTX_REPOS` must not contain spaces. Labels are lowercase
+`[a-z0-9_-]+`.
 
 ## Comms
 
-Run:
+`Hyper+V` / `niri-ctx comms`: opens missing Slack/Telegram/Discord, moves them
+to `comms`, orders them Slack, Telegram, Discord and stacks them into one
+full-width column with roughly equal heights (best effort — niri layout
+constraints apply).
+
+## DevTools / top display
+
+Frontend mode was removed (2026-07-04). Focus a window and press `Hyper+D`
+(`devtools-here`) to send it to the current context's devtools workspace on
+`DP-2`; `Hyper+Escape` returns `DP-2` to `top-ambient`. Focus always comes
+back to `DP-1`.
+
+`DP-2` does NOT follow focus automatically: `TOP_FOLLOW="off"` and the
+`niri-ctx-watch.service` unit is disabled; `install.sh` never enables it.
+The Rust watcher exists (`niri-ctx watch`, see `WATCHER_DESIGN.md`) for
+opting back in: set `TOP_FOLLOW` to `devtools` or `ambient`, then link and
+enable the unit per the comments in `install.sh`.
+
+## Health and debugging
 
 ```sh
-niri-ctx comms
+niri-ctx doctor          # full environment check
+niri-ctx current         # which context am I in?
+niri-ctx inspect --json  # what does the dispatcher see?
+niri-ctx plan open UP    # what WOULD it do?
 ```
 
-or press `Hyper+V`.
+The dispatcher logs every invocation and executed action to
+`${XDG_CACHE_HOME:-$HOME/.cache}/niri-ctx/log` (Bash and Rust share the file).
+`--verbose` adds detail on stderr.
 
-The dispatcher opens missing Slack, Telegram, and Discord windows, ensures they are on `comms`, orders them Slack, Telegram, Discord, and stacks them into one column when possible.
+Launch failures are loud: if a terminal process dies, the error reports the
+exit code; if it stays alive but its window never maps (the ghostty/VRAM
+mode), the error says exactly that, and the dispatcher self-heals once
+(kill by class marker + retry) before reporting.
 
-## DevTools
+If a card opens on the wrong workspace: `niri msg pick-window` to verify the
+app ID, `niri validate -c ~/.config/niri/config.kdl`, then check the log.
+If a browser card focuses the wrong window: `niri-ctx doctor`, then remove the
+stale cache entry only after confirming the window is gone.
+If terminal sessions misbehave: `SESSION_BACKEND="tmux"` bypasses herdr.
 
-Frontend mode was removed (2026-07-04). To put a DevTools window on the top display,
-focus it and press `Hyper+D` to run:
+## Rollback
 
 ```sh
-niri-ctx devtools-here
+./install.sh --bash    # relink ~/.local/bin/niri-ctx to the Bash dispatcher
+./install.sh           # back to Rust
 ```
 
-## Watch Daemon (disabled)
-
-`niri-ctx watch` exists but is NOT enabled: `TOP_FOLLOW="off"` and the
-`niri-ctx-watch.service` unit is disabled and unlinked. install.sh does not
-re-enable it. The unit file remains in the repo for opting back in.
-
-## Health Check
-
-Run:
-
-```sh
-niri-ctx doctor
-```
-
-The doctor checks niri config validation, `NIRI_SOCKET`, expected outputs, project directories, required binaries, optional Spotify support, Herdr backend/config state, the watcher service, stale legacy browser caches, and whether keybinds reference the installed `niri-ctx` path.
-
-## Troubleshooting
-
-If a project card opens on the wrong workspace:
-
-- Run `niri msg pick-window` and verify the app ID matches `dev.yiannis.niri.<slug>.<role>` for terminal cards.
-- Run `niri validate -c ~/.config/niri/config.kdl` and fix rule parse errors.
-- Check `${XDG_CACHE_HOME:-$HOME/.cache}/niri-ctx/log` for dispatcher actions.
-
-If a browser card focuses the wrong window:
-
-- Run `niri-ctx doctor`.
-- Remove stale entries under `${XDG_CACHE_HOME:-$HOME/.cache}/niri-ctx/` only after confirming the window no longer exists.
-
-`DP-2` does not follow browser focus: this is intentional (`TOP_FOLLOW="off"`,
-watch service disabled). Use `Hyper+Escape` / `Hyper+D`.
-
-If terminal sessions do not start:
-
-- Set `SESSION_BACKEND="tmux"` to bypass Herdr temporarily.
-- If using Herdr, confirm `command -v herdr` succeeds and `niri-ctx doctor` does not report a backend mismatch.
+`tests/converge.sh` verifies either implementation live
+(`NIRI_CTX=<path> ./tests/converge.sh`, 24 assertions).

@@ -19,10 +19,40 @@ info() {
     printf '%s\n' "$*"
 }
 
+# Dispatcher implementation: Rust (default) or Bash (rollback).
+#   ./install.sh          -> build + link the Rust dispatcher
+#   ./install.sh --bash   -> link the legacy Bash dispatcher (instant rollback)
+# The Bash script stays at bin/niri-ctx permanently: it is the rollback
+# implementation AND the --tmux-role in-terminal attach path that the Rust
+# dispatcher execs (behavior.bash_fallback).
+IMPL="rust"
+[[ "${1:-}" == "--bash" ]] && IMPL="bash"
+
+RUST_BIN="$REPO_ROOT/rust/niri-ctx/target/release/niri-ctx"
+
 mkdir -p "$LOCAL_BIN"
 chmod +x "$REPO_ROOT/bin/niri-ctx"
-ln -sfn "$REPO_ROOT/bin/niri-ctx" "$LOCAL_BIN/niri-ctx"
-info "linked $LOCAL_BIN/niri-ctx"
+
+if [[ "$IMPL" == "rust" ]]; then
+    if command -v cargo >/dev/null 2>&1; then
+        info "building rust dispatcher..."
+        (cd "$REPO_ROOT/rust/niri-ctx" && cargo build --release) || warn "cargo build failed"
+    else
+        warn "cargo not found; using existing rust binary if present"
+    fi
+    if [[ -x "$RUST_BIN" ]]; then
+        ln -sfn "$RUST_BIN" "$LOCAL_BIN/niri-ctx"
+        info "linked $LOCAL_BIN/niri-ctx -> rust dispatcher"
+    else
+        warn "rust binary missing at $RUST_BIN; falling back to bash dispatcher"
+        IMPL="bash"
+    fi
+fi
+
+if [[ "$IMPL" == "bash" ]]; then
+    ln -sfn "$REPO_ROOT/bin/niri-ctx" "$LOCAL_BIN/niri-ctx"
+    info "linked $LOCAL_BIN/niri-ctx -> bash dispatcher"
+fi
 
 mkdir -p "$HERDR_DIR"
 if [[ -e "$HERDR_CONFIG" && ! -L "$HERDR_CONFIG" ]]; then

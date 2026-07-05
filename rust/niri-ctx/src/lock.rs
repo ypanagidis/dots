@@ -37,6 +37,30 @@ impl GlobalLock {
             Err(source) => Err(NiriCtxError::io(&path, std::io::Error::from(source))),
         }
     }
+
+    pub fn is_busy_probe() -> Result<bool> {
+        let path = lock_path()?;
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).map_err(|source| NiriCtxError::io(parent, source))?;
+        }
+        let fd = open(
+            &path,
+            OFlags::CREATE | OFlags::WRONLY | OFlags::CLOEXEC,
+            Mode::RUSR | Mode::WUSR | Mode::RGRP | Mode::ROTH,
+        )
+        .map_err(|source| NiriCtxError::io(&path, std::io::Error::from(source)))?;
+        match flock(&fd, FlockOperation::NonBlockingLockExclusive) {
+            Ok(()) => {
+                flock(&fd, FlockOperation::Unlock)
+                    .map_err(|source| NiriCtxError::io(&path, std::io::Error::from(source)))?;
+                Ok(false)
+            }
+            Err(err) if err == rustix::io::Errno::WOULDBLOCK || err == rustix::io::Errno::AGAIN => {
+                Ok(true)
+            }
+            Err(source) => Err(NiriCtxError::io(&path, std::io::Error::from(source))),
+        }
+    }
 }
 
 fn lock_path() -> Result<PathBuf> {

@@ -5,12 +5,22 @@ use std::sync::mpsc;
 use std::thread;
 use std::time::{Duration, Instant};
 
+use serde::de::DeserializeOwned;
 use serde::Deserialize;
 
 use crate::error::{NiriCtxError, Result};
 use crate::model::{WindowId, WindowMatcher, WorkspaceId, WorkspaceRef};
 
 use super::{NiriAction, NiriClient, Window, Workspace};
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum WatchEvent {
+    WorkspacesChanged(Vec<Workspace>),
+    WindowsChanged(Vec<Window>),
+    WindowOpenedOrChanged(Window),
+    WindowClosed(WindowId),
+    WindowFocusChanged(Option<WindowId>),
+}
 
 #[derive(Debug, Default)]
 pub struct IpcNiriClient;
@@ -259,49 +269,99 @@ fn event_stream(
 
 #[allow(dead_code)]
 fn windows_from_event_line(line: &str) -> Vec<Window> {
-    let value: serde_json::Value = match serde_json::from_str(line) {
-        Ok(value) => value,
-        Err(err) => {
-            tracing::debug!("skipping malformed event: {err}");
-            return Vec::new();
-        }
-    };
-    let Some(object) = value.as_object() else {
-        return Vec::new();
-    };
-    let Some((tag, payload)) = object.iter().next() else {
-        return Vec::new();
-    };
+    match watch_event_from_line(line) {
+        Some(WatchEvent::WindowsChanged(windows)) => windows,
+        Some(WatchEvent::WindowOpenedOrChanged(window)) => vec![window],
+        _ => Vec::new(),
+    }
+}
+
+pub(crate) fn watch_event_from_line(line: &str) -> Option<WatchEvent> {
+    let (tag, payload) = event_tag_payload(line)?;
     match tag.as_str() {
+        "WorkspacesChanged" => {
+            #[derive(Deserialize)]
+            struct Payload {
+                workspaces: Vec<niri_ipc::Workspace>,
+            }
+            deserialize_event_payload::<Payload>(&tag, payload).map(|payload| {
+                WatchEvent::WorkspacesChanged(
+                    payload
+                        .workspaces
+                        .into_iter()
+                        .map(Workspace::from)
+                        .collect(),
+                )
+            })
+        }
         "WindowsChanged" => {
             #[derive(Deserialize)]
             struct Payload {
                 windows: Vec<niri_ipc::Window>,
             }
-            match serde_json::from_value::<Payload>(payload.clone()) {
-                Ok(payload) => payload.windows.into_iter().map(Window::from).collect(),
-                Err(err) => {
-                    tracing::debug!("skipping malformed WindowsChanged event: {err}");
-                    Vec::new()
-                }
-            }
+            deserialize_event_payload::<Payload>(&tag, payload).map(|payload| {
+                WatchEvent::WindowsChanged(payload.windows.into_iter().map(Window::from).collect())
+            })
         }
         "WindowOpenedOrChanged" => {
             #[derive(Deserialize)]
             struct Payload {
                 window: niri_ipc::Window,
             }
-            match serde_json::from_value::<Payload>(payload.clone()) {
-                Ok(payload) => vec![Window::from(payload.window)],
-                Err(err) => {
-                    tracing::debug!("skipping malformed WindowOpenedOrChanged event: {err}");
-                    Vec::new()
-                }
+            deserialize_event_payload::<Payload>(&tag, payload)
+                .map(|payload| WatchEvent::WindowOpenedOrChanged(Window::from(payload.window)))
+        }
+        "WindowClosed" => {
+            #[derive(Deserialize)]
+            struct Payload {
+                id: u64,
             }
+            deserialize_event_payload::<Payload>(&tag, payload)
+                .map(|payload| WatchEvent::WindowClosed(WindowId(payload.id)))
+        }
+        "WindowFocusChanged" => {
+            #[derive(Deserialize)]
+            struct Payload {
+                id: Option<u64>,
+            }
+            deserialize_event_payload::<Payload>(&tag, payload)
+                .map(|payload| WatchEvent::WindowFocusChanged(payload.id.map(WindowId)))
         }
         _ => {
-            tracing::debug!("skipping unknown niri event {tag}");
-            Vec::new()
+            tracing::trace!("skipping unknown niri event {tag}");
+            None
+        }
+    }
+}
+
+fn event_tag_payload(line: &str) -> Option<(String, serde_json::Value)> {
+    let value: serde_json::Value = match serde_json::from_str(line) {
+        Ok(value) => value,
+        Err(err) => {
+            tracing::debug!("skipping malformed event: {err}");
+            return None;
+        }
+    };
+    let Some(object) = value.as_object() else {
+        tracing::debug!("skipping event with non-object top level");
+        return None;
+    };
+    let Some((tag, payload)) = object.iter().next() else {
+        tracing::debug!("skipping event with empty object");
+        return None;
+    };
+    Some((tag.clone(), payload.clone()))
+}
+
+fn deserialize_event_payload<T: DeserializeOwned>(
+    tag: &str,
+    payload: serde_json::Value,
+) -> Option<T> {
+    match serde_json::from_value(payload) {
+        Ok(payload) => Some(payload),
+        Err(err) => {
+            tracing::debug!("skipping malformed {tag} event: {err}");
+            None
         }
     }
 }
@@ -367,4 +427,29 @@ fn ids_for_app(windows: &[Window], app_id: &str) -> BTreeSet<WindowId> {
         .filter(|window| window.app_id == app_id)
         .map(|window| window.id)
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn watch_event_decode_skips_unknown_and_malformed_then_continues() {
+        assert!(watch_event_from_line(r#"{"KeyboardLayoutSwitched":{"idx":1}}"#).is_none());
+        assert!(watch_event_from_line("not-json").is_none());
+
+        assert_eq!(
+            watch_event_from_line(r#"{"WindowFocusChanged":{"id":42}}"#),
+            Some(WatchEvent::WindowFocusChanged(Some(WindowId(42))))
+        );
+    }
+
+    #[test]
+    fn watch_event_decode_skips_malformed_payload_only() {
+        assert!(watch_event_from_line(r#"{"WindowClosed":{"id":"bad"}}"#).is_none());
+        assert_eq!(
+            watch_event_from_line(r#"{"WindowFocusChanged":{"id":null}}"#),
+            Some(WatchEvent::WindowFocusChanged(None))
+        );
+    }
 }

@@ -171,3 +171,17 @@ Then set `font-family` in `.config/ghostty/config` to the installed font.
 - `gnupg` is included for git commit signing; `GPG_TTY` is exported in `.zshenv`.
 - **Not tracked here:** Karabiner, Zed, Raycast, and other app GUIs. This repo
   covers shell, Neovim, tmux, Ghostty, lazygit, git, and VSCode keymaps/settings.
+
+## Niri workflow (Linux)
+
+The three-monitor niri workflow is driven by one dispatcher, `niri-ctx` — a
+Rust CLI (`rust/niri-ctx/`) installed by `install.sh`, with the original Bash
+implementation kept at `bin/niri-ctx` for instant rollback
+(`./install.sh --bash`). One workspace per work context on the main display;
+each context is a docs-browser card plus one work-terminal card whose
+editor/agents/logs roles live inside herdr; the vertical display is static
+comms; the top display is ambient or per-context devtools.
+
+See `.config/niri/WORKFLOW.md` for the full model, hotkeys, and debugging
+(`niri-ctx doctor` / `inspect` / `plan`), and `tests/converge.sh` for the live
+convergence contract.

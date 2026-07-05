@@ -60,7 +60,7 @@ fn run() -> Result<u8> {
     };
 
     match command {
-        Command::Watch => commands::watch::run().map(|()| 0),
+        Command::Watch => commands::watch::run(&cfg).map(|()| 0),
         Command::Doctor { json } => {
             commands::doctor::run(&cfg, cli.json || json).map(|code| code as u8)
         }
