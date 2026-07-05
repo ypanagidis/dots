@@ -2,3 +2,5 @@
 .lazy-lock.json
 lazy-lock.json
 .config/zsh/plugins/
+rust/niri-ctx/target/
+.config/zsh/.zcompdump*
