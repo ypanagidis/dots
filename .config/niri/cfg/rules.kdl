@@ -3,6 +3,15 @@
         clip-to-geometry true
     }
 
+    // Personal apps start fullscreen on the first context workspace.
+    window-rule {
+        match app-id=r#"(?i)^obsidian$"#
+        match app-id=r#"(?i)^1password$"#
+        open-on-output "DP-1"
+        open-on-workspace "scratch"
+        open-fullscreen true
+    }
+
     // Comms app IDs captured from `niri msg --json windows` on 2026-07-02:
     // Slack: app_id "slack"; Discord: app_id "discord".
     // Telegram: app_id "org.telegram.desktop".

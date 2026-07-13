@@ -3,3 +3,5 @@
 
     spawn-sh-at-startup "qs -c noctalia-shell"
     spawn-sh-at-startup "/home/yiannis/.local/bin/niri-ctx startup"
+    spawn-at-startup "obsidian"
+    spawn-at-startup "1password"
