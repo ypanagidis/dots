@@ -8,7 +8,7 @@ HERDR_DIR="$HOME/.config/herdr"
 HERDR_CONFIG="$HERDR_DIR/config.toml"
 USER_SYSTEMD="$HOME/.config/systemd/user"
 UNIT_NAME="niri-ctx-watch.service"
-UNIT_SRC="$REPO_ROOT/.config/systemd/user/$UNIT_NAME"
+UNIT_SRC="$REPO_ROOT/dots/.config/systemd/user/$UNIT_NAME"
 UNIT_DST="$USER_SYSTEMD/$UNIT_NAME"
 
 warn() {
@@ -31,7 +31,7 @@ IMPL="rust"
 RUST_BIN="$REPO_ROOT/rust/niri-ctx/target/release/niri-ctx"
 
 mkdir -p "$LOCAL_BIN"
-chmod +x "$REPO_ROOT/bin/niri-ctx"
+chmod +x "$REPO_ROOT/dots/bin/niri-ctx"
 
 if [[ "$IMPL" == "rust" ]]; then
     if command -v cargo >/dev/null 2>&1; then
@@ -50,7 +50,7 @@ if [[ "$IMPL" == "rust" ]]; then
 fi
 
 if [[ "$IMPL" == "bash" ]]; then
-    ln -sfn "$REPO_ROOT/bin/niri-ctx" "$LOCAL_BIN/niri-ctx"
+    ln -sfn "$REPO_ROOT/dots/bin/niri-ctx" "$LOCAL_BIN/niri-ctx"
     info "linked $LOCAL_BIN/niri-ctx -> bash dispatcher"
 fi
 
@@ -60,7 +60,7 @@ if [[ -e "$HERDR_CONFIG" && ! -L "$HERDR_CONFIG" ]]; then
     mv "$HERDR_CONFIG" "$herdr_backup"
     info "backed up $HERDR_CONFIG to $herdr_backup"
 fi
-ln -sfn "$REPO_ROOT/.config/herdr/config.toml" "$HERDR_CONFIG"
+ln -sfn "$REPO_ROOT/dots/.config/herdr/config.toml" "$HERDR_CONFIG"
 info "linked $HERDR_CONFIG"
 if command -v herdr >/dev/null 2>&1 && pgrep -u "$(id -u)" -x herdr >/dev/null 2>&1; then
     timeout 5 herdr server reload-config >/dev/null 2>&1 || true
@@ -78,7 +78,7 @@ legacy_names=(
 )
 
 for name in "${legacy_names[@]}"; do
-    legacy_src="$REPO_ROOT/legacy/niri-scripts/$name"
+    legacy_src="$REPO_ROOT/dots/legacy/niri-scripts/$name"
     installed="$LOCAL_BIN/$name"
     [[ -e "$installed" ]] || continue
     if [[ -f "$legacy_src" ]] && cmp -s "$legacy_src" "$installed"; then
@@ -100,7 +100,7 @@ fi
 if [[ -L "$NIRI_LINK" ]]; then
     niri_target="$(readlink -f "$NIRI_LINK" || true)"
     case "$niri_target" in
-        "$REPO_ROOT"/.config/niri|"$REPO_ROOT"/.config/niri/*)
+        "$REPO_ROOT"/dots/.config/niri|"$REPO_ROOT"/dots/.config/niri/*)
             info "$NIRI_LINK points into repo"
             ;;
         *)
@@ -112,7 +112,7 @@ else
 fi
 
 if command -v niri >/dev/null 2>&1; then
-    if niri validate -c "$REPO_ROOT/.config/niri/config.kdl"; then
+    if niri validate -c "$REPO_ROOT/dots/.config/niri/config.kdl"; then
         info "niri validate passed"
     else
         warn "niri validate failed"

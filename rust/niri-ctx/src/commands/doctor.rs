@@ -68,7 +68,7 @@ fn check_binary(name: &str) -> Check {
 }
 
 fn check_niri_validate() -> Check {
-    let config = repo_root().join(".config/niri/config.kdl");
+    let config = repo_root().join("dots/.config/niri/config.kdl");
     if !command_exists("niri") {
         return fail("niri validate", "niri not found");
     }
@@ -186,7 +186,7 @@ fn check_herdr_symlink() -> Check {
     };
     let path = Path::new(&home).join(".config/herdr/config.toml");
     match fs::read_link(&path) {
-        Ok(target) if target == repo_root().join(".config/herdr/config.toml") => {
+        Ok(target) if target == repo_root().join("dots/.config/herdr/config.toml") => {
             ok("herdr config", "symlink ok")
         }
         Ok(target) => warn("herdr config", &format!("points to {}", target.display())),
@@ -236,7 +236,7 @@ fn check_installed_path_and_keybinds() -> Check {
         return warn("installed niri-ctx", "HOME not set");
     };
     let installed = Path::new(&home).join(".local/bin/niri-ctx");
-    let keybinds = repo_root().join(".config/niri/cfg/keybinds.kdl");
+    let keybinds = repo_root().join("dots/.config/niri/cfg/keybinds.kdl");
     let keybinds_ok = fs::read_to_string(&keybinds)
         .map(|text| text.contains("niri-ctx"))
         .unwrap_or(false);

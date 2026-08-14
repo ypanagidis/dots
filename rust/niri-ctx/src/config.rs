@@ -84,7 +84,7 @@ impl Config {
     pub fn load() -> Result<Self> {
         let repo_root = repo_root();
         let mut config = Self::default_for_repo(&repo_root);
-        let contexts_path = repo_root.join(".config/niri/contexts.conf");
+        let contexts_path = repo_root.join("dots/.config/niri/contexts.conf");
         if contexts_path.exists() {
             config.merge_contexts_conf(&contexts_path)?;
         } else if let Some(home) = home_dir() {
@@ -122,7 +122,7 @@ impl Config {
                 top_follow: "off".to_string(),
                 launch_timeout_secs: 10,
                 converge_iters: 4,
-                bash_fallback: repo_root.join("bin/niri-ctx"),
+                bash_fallback: repo_root.join("dots/bin/niri-ctx"),
             },
             terminal: TerminalConfig {
                 program: "ghostty".to_string(),
