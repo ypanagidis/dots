@@ -24,8 +24,9 @@ Keybindings call `niri-ctx`; window rules handle stable placement.
 - `DP-2` (top): ambient (`top-ambient`, Spotify) or a context's devtools.
 - `HDMI-A-1` (vertical): static comms — Slack, Telegram, Discord.
 - A context = **two full-screen-ish cards**: docs browser (column 1) + one
-  work terminal (column 2). Editor/agents/logs live INSIDE the work terminal
-  as herdr tabs, one herdr workspace per repo. An output browser is on-demand.
+  work terminal (column 2). Plain context open is restoration-first: it restores
+  these outer cards and directly resumes the terminal session without changing
+  its active Herdr workspace/tab or tmux window. An output browser is on-demand.
 
 ## Monitors and startup
 
@@ -106,7 +107,9 @@ is always safe; a settled state plans zero actions.
 
 `niri-ctx open <ctx>` guarantees: docs browser at column 1, work terminal at
 column 2, both on the context workspace, focus ending on the docs card.
-Drifted cards are moved back; stacked cards are expelled apart.
+Drifted cards are moved back; stacked cards are expelled apart. It passes the
+`all` role through to the terminal attach and does not ensure labels/tabs,
+bootstrap nvim, or refocus anything inside an existing Herdr/tmux session.
 
 Work terminals carry app-id `dev.yiannis.niri.<slug>.work` (scratch:
 `dev.yiannis.niri.scratch.term`); rules.kdl places them declaratively (rules
@@ -119,21 +122,28 @@ Browser cards are tracked by cache files under
 entries are invalidated on compositor restart or window death, and a fresh
 card is spawned and re-cached automatically).
 
-## Terminal sessions (herdr, repo-major)
+## Terminal sessions (restoration-first)
 
-Each context has ONE herdr session, `<Ctx>-work`. Inside it:
+Each context uses one session, `<Ctx>-work`. Plain `open <ctx>` attaches to it
+as-is: an existing session keeps its active workspace/tab/window, and a fresh
+Herdr session starts as one ordinary shell at the first `CTX_REPOS` directory
+(via the existing `cd` / `HERDR_STARTUP_CWD` path). No bulk repo creation,
+labeling, tab creation, legacy rename, or nvim bootstrap runs on plain open.
+Existing duplicate workspaces/tabs are left alone.
 
-- one herdr **workspace per repo** (from `CTX_REPOS`, first entry = default),
-- tabs `editor` / `agents` / `logs` in that order inside each repo workspace,
-  so `prefix+1/2/3` is uniform everywhere,
-- the editor tab runs `nvim`.
+Explicit deep-links remain surgical:
 
-Role deep-links (`open <ctx> agents` etc.) act on the currently focused repo
-workspace, falling back to the default repo; `open <ctx> repo:<label>`
-focuses/creates a repo workspace. `Admin` is one plain `term` workspace.
+- `editor` / `agents` / `logs` / `term` use the currently focused repo
+  workspace, falling back to the first configured repo;
+- only the requested workspace/tab is created or focused;
+- `repo:<label>` creates or focuses only that repo workspace;
+- nvim starts only when an explicit editor target is newly created or an
+  untouched fresh editor shell is adopted.
 
-tmux is the invisible fallback (`SESSION_BACKEND="tmux"` to force): same
-session name, windows named `<repo>/<role>`.
+`Admin` remains a plain terminal target. tmux is the invisible fallback
+(`SESSION_BACKEND="tmux"` to force): existing plain opens preserve the active
+window, fresh plain opens create one shell, and explicit roles create/select
+only one `<repo>/<role>` window.
 
 Herdr keys: `Ctrl+S` prefix; `prefix+d` detach, `prefix+v`/`prefix+-` splits,
 `prefix+m` zoom, `prefix+u` scrollback, `prefix+c` new tab, `prefix+1..9`
@@ -145,7 +155,7 @@ Source of truth for repos, profiles, outputs, terminal, backend, top-follow:
 
 ```bash
 CTX_REPOS[UP]="mono=$HOME/Developer/Work/UP/mono"
-CTX_REPOS[Webroot]="webroot=$HOME/Developer/Work/Webroot"
+CTX_REPOS[Webroot]="helios-kiosk-sso=... scribe=... co-author-api=... co-author-plugin=... billing=..."
 CTX_REPOS[Sealant]="core=$HOME/Developer/OSS/Sealant/Core sealantd=$HOME/Developer/OSS/Sealant/Sealantd"
 CTX_REPOS[Side]="sandbox=$HOME/Developer/sandbox"
 CTX_REPOS[Admin]="term=$HOME"

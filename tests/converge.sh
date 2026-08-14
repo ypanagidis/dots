@@ -67,22 +67,34 @@ up_work_focused() { # prints "<focused-workspace-label>/<focused-tab-label>"
     printf '%s/%s\n' "$wslabel" "$tablabel"
 }
 
-up_work_repo_tabs() { # prints the mono workspace's first three tab labels in order
-    local wsid
+up_work_state() { # exact signature of workspace/tab ids, labels, order, and focus
     [[ -S "$UP_SOCK" ]] || { printf 'no-sock\n'; return; }
-    wsid="$(up_herdr workspace list \
-        | jq -r 'first(.result.workspaces[]? | select(.label == "mono") | .workspace_id) // empty')"
-    [[ -n "$wsid" ]] || { printf 'no-mono\n'; return; }
-    up_herdr tab list --workspace "$wsid" \
-        | jq -r '[.result.tabs[]? | {label, number}] | sort_by(.number) | .[0:3] | map(.label) | join(" ")'
+    local workspace_json workspaces tabs wsid
+    workspace_json="$(up_herdr workspace list)"
+    workspaces="$(jq -c '[.result.workspaces[]? | {workspace_id, label, focused}] | sort_by(.workspace_id)' <<< "$workspace_json")"
+    tabs=""
+    while IFS= read -r wsid; do
+        tabs+="${wsid}:$(up_herdr tab list --workspace "$wsid" \
+            | jq -c '[.result.tabs[]? | {tab_id, label, number, focused}] | sort_by(.number, .tab_id)');"
+    done < <(jq -r '.result.workspaces[]?.workspace_id' <<< "$workspace_json" | sort)
+    printf '%s|%s\n' "$workspaces" "$tabs"
 }
 
-say "=== S1: open UP twice is idempotent and canonical ==="
+say "=== S1: open UP twice restores cards without touching Herdr state ==="
+herdr_before="$(up_work_state)"
 "$NIRI_CTX" open UP; sleep 2
 c1="$(window_count)"
+herdr_after_first="$(up_work_state)"
 "$NIRI_CTX" open UP; sleep 2
 c2="$(window_count)"
+herdr_after_second="$(up_work_state)"
 check "S1 window count stable" "$c2" "$c1"
+if [[ "$herdr_before" != "no-sock" ]]; then
+    check "S1 first open preserves Herdr internals" "$herdr_after_first" "$herdr_before"
+    check "S1 second open preserves Herdr internals" "$herdr_after_second" "$herdr_before"
+else
+    say "SKIP S1 Herdr-state preservation (no existing socket before open)"
+fi
 assert_up_canonical S1
 
 say "=== S2: cards scattered to other workspaces converge back ==="
@@ -104,17 +116,16 @@ sleep 1
 check "S3 window count stable" "$(window_count)" "$c1"
 assert_up_canonical S3
 
-say "=== S3b: repo-major canon — mono workspace holds the role tabs in order ==="
-check "S3b mono tabs editor/agents/logs" "$(up_work_repo_tabs)" "editor agents logs"
-legacy_editor="$(up_herdr workspace list | jq -r '[.result.workspaces[]? | select(.label == "editor")] | length')"
-check "S3b legacy editor workspace migrated away" "$legacy_editor" "0"
-
-say "=== S3c: role deep-links land on the role tab of the current repo ==="
+say "=== S3b: explicit deep-links target only the requested repo/tab ==="
 "$NIRI_CTX" open UP repo:mono >/dev/null; sleep 1
-check "S3c repo:mono focuses mono" "$(up_work_focused | cut -d/ -f1)" "mono"
+check "S3b repo:mono focuses mono" "$(up_work_focused | cut -d/ -f1)" "mono"
 for role in agents logs editor; do
+    before_workspaces="$(up_herdr workspace list | jq -r '[.result.workspaces[]?.label] | sort | join(",")')"
     "$NIRI_CTX" open UP "$role" >/dev/null; sleep 1
-    check "S3c deep-link $role" "$(up_work_focused)" "mono/$role"
+    check "S3b deep-link $role" "$(up_work_focused)" "mono/$role"
+    check "S3b $role leaves workspace set unchanged" \
+        "$(up_herdr workspace list | jq -r '[.result.workspaces[]?.label] | sort | join(",")')" \
+        "$before_workspaces"
 done
 
 say "=== S4: comms converges from slack exiled to UP ==="

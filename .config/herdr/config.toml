@@ -78,8 +78,8 @@ detach = "prefix+d"           # tmux muscle memory (herdr default was prefix+q)
 # close_workspace = "prefix+shift+d"
 previous_workspace = "prefix+ctrl+k"  # k=up=prev; ctrl-chord keeps plain j/k for pane focus
 next_workspace = "prefix+ctrl+j"      # j=down=next; only fires after the ctrl+s prefix, so nvim C-j is safe
-# previous_agent = ""     # optional, unset by default
-# next_agent = ""         # optional, unset by default
+previous_agent = "ctrl+shift+k"
+next_agent = "ctrl+shift+j"
 # focus_agent = ""        # optional indexed binding, e.g. "prefix+alt+1..9"
 # remote_image_paste = "ctrl+v" # only active in herdr --remote; empty disables raw-key image paste
 # new_tab = "prefix+c"

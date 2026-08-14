@@ -29,3 +29,6 @@ background-opacity-cells = true
 background-blur = true
 window-padding-x = 10
 window-padding-y = 8
+
+# Let Herdr use Ctrl-Shift-J for next-agent navigation.
+keybind = ctrl+shift+j=unbind

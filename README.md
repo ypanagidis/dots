@@ -178,9 +178,10 @@ The three-monitor niri workflow is driven by one dispatcher, `niri-ctx` — a
 Rust CLI (`rust/niri-ctx/`) installed by `install.sh`, with the original Bash
 implementation kept at `bin/niri-ctx` for instant rollback
 (`./install.sh --bash`). One workspace per work context on the main display;
-each context is a docs-browser card plus one work-terminal card whose
-editor/agents/logs roles live inside herdr; the vertical display is static
-comms; the top display is ambient or per-context devtools.
+each context is a docs-browser card plus one restoration-first work-terminal
+card. Plain opens resume Herdr/tmux where it was left, while explicit
+editor/agents/logs/repo links target only what was requested. The vertical
+display is static comms; the top display is ambient or per-context devtools.
 
 See `.config/niri/WORKFLOW.md` for the full model, hotkeys, and debugging
 (`niri-ctx doctor` / `inspect` / `plan`), and `tests/converge.sh` for the live

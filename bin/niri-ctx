@@ -127,7 +127,7 @@ normalize_role() {
 
 terminal_role_name() {
     case "$1" in
-        editor|agents|logs|term|repo:*) printf '%s\n' "$1" ;;
+        all|editor|agents|logs|term|repo:*) printf '%s\n' "$1" ;;
         *) return 1 ;;
     esac
 }
@@ -403,7 +403,9 @@ focus_or_launch_terminal() {
         fi
         ctx_focus_workspace "$MAIN_OUTPUT" "$ctx"
         focus_window_id "$id"
-        deep_link_role "$ctx" "$role"
+        if [[ "$role" != "all" ]]; then
+            deep_link_role "$ctx" "$role"
+        fi
         printf '%s\n' "$id"
         return 0
     fi
@@ -536,14 +538,13 @@ flatten_tracked_cards() {
 }
 
 open_all() {
-    local ctx="$1" docs_id work_id work_role=editor
+    local ctx="$1" docs_id work_id
     ctx_focus_workspace "$MAIN_OUTPUT" "$ctx"
-    [[ "$ctx" == "Admin" ]] && work_role=term
     # A single slow/failed card must not abort the rest of the context open.
     # Two cards per context: docs browser + the work terminal (roles are
     # herdr workspaces inside it). The output browser stays on-demand.
     docs_id="$(focus_or_launch_browser "$ctx" docs || true)"
-    work_id="$(focus_or_launch_terminal "$ctx" "$work_role" || true)"
+    work_id="$(focus_or_launch_terminal "$ctx" all || true)"
     flatten_tracked_cards "$ctx" "$docs_id" "$work_id"
     move_column_to_index_if_needed "$docs_id" 1 "$ctx"
     move_column_to_index_if_needed "$work_id" 2 "$ctx"
@@ -563,45 +564,49 @@ open_role() {
     esac
 }
 
-# Fallback backend: one tmux session per context. tmux has no workspace
-# layer, so the herdr repo/tab canon flattens to windows named "repo/role".
+# Fallback backend: plain `all` resumes without selecting another window.
+# Fresh `all` creates one shell at the default repo. Explicit roles create or
+# select only their requested repo/role window; editor alone starts nvim.
 tmux_attach_work() {
-    local session="$1" ctx="$2" role="$3" window spec label dir first=1 cur repo
-    if ! tmux has-session -t "$session" 2>/dev/null; then
-        if [[ "$ctx" == "Admin" ]]; then
-            tmux new-session -d -s "$session" -c "$HOME" -n term
-        else
-            while IFS= read -r spec; do
-                label="${spec%%=*}"
-                dir="${spec#*=}"
-                [[ -n "$label" && "$spec" == *=* ]] || continue
-                if ((first)); then
-                    tmux new-session -d -s "$session" -c "$dir" -n "$label/editor" nvim
-                    first=0
-                else
-                    tmux new-window -d -t "$session" -c "$dir" -n "$label/editor" nvim
-                fi
-                tmux new-window -d -t "$session" -c "$dir" -n "$label/agents"
-                tmux new-window -d -t "$session" -c "$dir" -n "$label/logs"
-            done < <(ctx_repo_specs "$ctx")
-            if ((first)); then
-                tmux new-session -d -s "$session" -c "$HOME" -n term
-            fi
+    local session="$1" ctx="$2" role="$3" window cur repo dir exists=0
+    tmux has-session -t "$session" 2>/dev/null && exists=1
+    if [[ "$role" == all ]]; then
+        if ((exists == 0)); then
+            dir="$(ctx_default_repo_dir "$ctx")"
+            tmux new-session -d -s "$session" -c "$dir"
         fi
+        exec tmux attach-session -t "$session"
     fi
-    if [[ "$ctx" == "Admin" ]]; then
+    if [[ "$ctx" == Admin ]]; then
         window=term
+        dir="$(ctx_default_repo_dir "$ctx")"
     elif [[ "$role" == repo:* ]]; then
-        window="${role#repo:}/editor"
+        repo="${role#repo:}"
+        window="$repo/term"
+        dir="$(ctx_repo_dir "$ctx" "$repo")" || return 1
     else
-        # Role acts on the current repo, read off the active window's name.
         cur="$(tmux display-message -p -t "$session" '#{window_name}' 2>/dev/null || true)"
         repo="${cur%%/*}"
         [[ -n "$repo" && "$cur" == */* ]] || repo="$(ctx_default_repo_label "$ctx")"
         window="$repo/$role"
+        dir="$(ctx_repo_dir "$ctx" "$repo")" || dir="$(ctx_default_repo_dir "$ctx")"
     fi
-    tmux select-window -t "${session}:${window}" 2>/dev/null \
-        || tmux select-window -t "${session}:${role}" 2>/dev/null || true
+    if ! tmux list-windows -F '#{window_name}' -t "$session" 2>/dev/null | grep -Fxq -- "$window"; then
+        if ((exists)); then
+            if [[ "$window" == */editor ]]; then
+                tmux new-window -d -t "$session" -c "$dir" -n "$window" nvim
+            else
+                tmux new-window -d -t "$session" -c "$dir" -n "$window"
+            fi
+        elif [[ "$window" == */editor ]]; then
+            tmux new-session -d -s "$session" -c "$dir" -n "$window" nvim
+            exists=1
+        else
+            tmux new-session -d -s "$session" -c "$dir" -n "$window"
+            exists=1
+        fi
+    fi
+    tmux select-window -t "${session}:${window}" 2>/dev/null || true
     exec tmux attach-session -t "$session"
 }
 
@@ -614,7 +619,7 @@ herdr_session_name_valid() {
 role_session_name() {
     local ctx="$1" role="$2"
     case "$role" in
-        editor|agents|logs|term|repo:*) printf '%s-work\n' "$ctx" ;;
+        all|editor|agents|logs|term|repo:*) printf '%s-work\n' "$ctx" ;;
         *) return 1 ;;
     esac
 }
@@ -637,71 +642,9 @@ herdr_run_editor() {
     herdr_sock_cmd "$sock" pane run "$pane" nvim >/dev/null || true
 }
 
-# Converge a work session onto the repo-major canon: one workspace per
-# CTX_REPOS entry, each holding the role tabs editor/agents/logs in that
-# order. nvim starts only in editor panes created here, never in adopted
-# ones. Migration: a legacy role workspace labelled "editor" is RENAMED into
-# the default repo's workspace (its running nvim survives); a default tab
-# still labelled "1" is adopted as the editor tab. Legacy "agents"/"logs"
-# workspaces are left for the user to close. Idempotent; no-op w/o socket.
-herdr_ensure_layout() {
-    local session="$1" ctx="$2" sock ws_json spec label dir wsid tab_json tabid pane create_json role default_label legacy_wsid
-    sock="$(herdr_sock_for_session "$session")"
-    [[ -S "$sock" ]] || return 0
-    [[ "$ctx" == "Admin" ]] && return 0
-    ws_json="$(herdr_sock_cmd "$sock" workspace list || true)"
-    [[ -n "$ws_json" ]] || return 0
-    default_label="$(ctx_default_repo_label "$ctx")"
-    while IFS= read -r spec; do
-        label="${spec%%=*}"
-        dir="${spec#*=}"
-        [[ -n "$label" && "$spec" == *=* ]] || continue
-        wsid="$(jq -r --arg label "$label" \
-            'first(.result.workspaces[]? | select(.label == $label) | .workspace_id) // empty' <<< "$ws_json" || true)"
-        if [[ -z "$wsid" && "$label" == "$default_label" ]]; then
-            legacy_wsid="$(jq -r 'first(.result.workspaces[]? | select(.label == "editor") | .workspace_id) // empty' <<< "$ws_json" || true)"
-            if [[ -n "$legacy_wsid" ]]; then
-                herdr_sock_cmd "$sock" workspace rename "$legacy_wsid" "$label" >/dev/null || true
-                wsid="$legacy_wsid"
-            fi
-        fi
-        if [[ -z "$wsid" ]]; then
-            create_json="$(herdr_sock_cmd "$sock" workspace create --label "$label" --cwd "$dir" --no-focus || true)"
-            wsid="$(jq -r '.result.workspace.workspace_id // empty' <<< "$create_json" || true)"
-            [[ -n "$wsid" ]] || continue
-            tabid="$(jq -r '.result.tab.tab_id // empty' <<< "$create_json" || true)"
-            [[ -n "$tabid" ]] && herdr_sock_cmd "$sock" tab rename "$tabid" editor >/dev/null || true
-            herdr_run_editor "$sock" "$(jq -r '.result.root_pane.pane_id // empty' <<< "$create_json" || true)"
-        fi
-        tab_json="$(herdr_sock_cmd "$sock" tab list --workspace "$wsid" || true)"
-        [[ -n "$tab_json" ]] || continue
-        for role in editor agents logs; do
-            tabid="$(jq -r --arg label "$role" \
-                'first(.result.tabs[]? | select(.label == $label) | .tab_id) // empty' <<< "$tab_json" || true)"
-            [[ -n "$tabid" ]] && continue
-            if [[ "$role" == "editor" ]]; then
-                # Adopt an untouched default tab so tab order (and the
-                # prefix+1..9 index mapping) stays editor/agents/logs.
-                tabid="$(jq -r 'first(.result.tabs[]? | select(.label == "1" and .number == 1) | .tab_id) // empty' <<< "$tab_json" || true)"
-                if [[ -n "$tabid" ]]; then
-                    herdr_sock_cmd "$sock" tab rename "$tabid" editor >/dev/null || true
-                    continue
-                fi
-            fi
-            create_json="$(herdr_sock_cmd "$sock" tab create --workspace "$wsid" --label "$role" --cwd "$dir" --no-focus || true)"
-            if [[ "$role" == "editor" ]]; then
-                herdr_run_editor "$sock" "$(jq -r '.result.root_pane.pane_id // empty' <<< "$create_json" || true)"
-            fi
-        done
-    done < <(ctx_repo_specs "$ctx")
-}
-
-# Focus (creating it first if missing) the herdr tab for a role. Role tabs
-# act on the CURRENTLY FOCUSED workspace ("agents of whatever repo I'm in");
-# legacy role-labelled workspaces and fresh sessions fall back to the default
-# repo. repo:<label> focuses that repo's workspace instead. Silently a no-op
-# while the socket is not up; the bootstrap armer owns the fresh-session
-# window.
+# Focus or create only the requested herdr target. Ordinary operations never
+# sweep CTX_REPOS or rename legacy workspaces. A newly adopted editor target is
+# the only path that starts nvim.
 herdr_focus_role_tab() {
     local session="$1" ctx="$2" role="$3" sock ws_json wsid label dir tab_json tabid create_json
     sock="$(herdr_sock_for_session "$session")"
@@ -710,16 +653,12 @@ herdr_focus_role_tab() {
     [[ -n "$ws_json" ]] || return 0
     if [[ "$ctx" == "Admin" ]]; then
         wsid="$(jq -r 'first(.result.workspaces[]? | select(.label == "term") | .workspace_id) // empty' <<< "$ws_json" || true)"
-        [[ -n "$wsid" ]] && herdr_sock_cmd "$sock" workspace focus "$wsid" >/dev/null || true
+        if [[ -n "$wsid" ]]; then
+            herdr_sock_cmd "$sock" workspace focus "$wsid" >/dev/null || true
+        else
+            herdr_sock_cmd "$sock" workspace create --label term --cwd "$(ctx_default_repo_dir "$ctx")" --focus >/dev/null || true
+        fi
         return 0
-    fi
-    # Self-heal: a session that predates the repo-major canon (or whose config
-    # gained repos) has no default-repo workspace; converge it before landing.
-    if ! jq -e --arg label "$(ctx_default_repo_label "$ctx")" \
-        'any(.result.workspaces[]?; .label == $label)' <<< "$ws_json" >/dev/null 2>&1; then
-        herdr_ensure_layout "$session" "$ctx"
-        ws_json="$(herdr_sock_cmd "$sock" workspace list || true)"
-        [[ -n "$ws_json" ]] || return 0
     fi
     if [[ "$role" == repo:* ]]; then
         label="${role#repo:}"
@@ -728,9 +667,9 @@ herdr_focus_role_tab() {
         if [[ -z "$wsid" ]]; then
             dir="$(ctx_repo_dir "$ctx" "$label")" || return 0
             herdr_sock_cmd "$sock" workspace create --label "$label" --cwd "$dir" --focus >/dev/null || true
-            return 0
+        else
+            herdr_sock_cmd "$sock" workspace focus "$wsid" >/dev/null || true
         fi
-        herdr_sock_cmd "$sock" workspace focus "$wsid" >/dev/null || true
         return 0
     fi
     wsid="$(jq -r 'first(.result.workspaces[]?
@@ -738,46 +677,82 @@ herdr_focus_role_tab() {
         | select(.label | IN("editor", "agents", "logs", "term") | not)
         | .workspace_id) // empty' <<< "$ws_json" || true)"
     if [[ -z "$wsid" ]]; then
-        wsid="$(jq -r --arg label "$(ctx_default_repo_label "$ctx")" \
+        label="$(ctx_default_repo_label "$ctx")"
+        wsid="$(jq -r --arg label "$label" \
             'first(.result.workspaces[]? | select(.label == $label) | .workspace_id) // empty' <<< "$ws_json" || true)"
+        if [[ -z "$wsid" ]]; then
+            dir="$(ctx_default_repo_dir "$ctx")"
+            create_json="$(herdr_sock_cmd "$sock" workspace create --label "$label" --cwd "$dir" --focus || true)"
+            wsid="$(jq -r '.result.workspace.workspace_id // empty' <<< "$create_json" || true)"
+            if [[ "$role" == editor ]]; then
+                tabid="$(jq -r '.result.tab.tab_id // empty' <<< "$create_json" || true)"
+                [[ -n "$tabid" ]] && herdr_sock_cmd "$sock" tab rename "$tabid" editor >/dev/null || true
+                herdr_run_editor "$sock" "$(jq -r '.result.root_pane.pane_id // empty' <<< "$create_json" || true)"
+                return 0
+            fi
+        fi
     fi
     [[ -n "$wsid" ]] || return 0
     tab_json="$(herdr_sock_cmd "$sock" tab list --workspace "$wsid" || true)"
     [[ -n "$tab_json" ]] || return 0
     tabid="$(jq -r --arg label "$role" \
         'first(.result.tabs[]? | select(.label == $label) | .tab_id) // empty' <<< "$tab_json" || true)"
-    if [[ -z "$tabid" ]]; then
-        # No --cwd: herdr's new_cwd=follow default inherits the workspace dir,
-        # which is also right for ad-hoc task workspaces we don't know about.
-        create_json="$(herdr_sock_cmd "$sock" tab create --workspace "$wsid" --label "$role" --focus || true)"
-        if [[ "$role" == "editor" ]]; then
-            herdr_run_editor "$sock" "$(jq -r '.result.root_pane.pane_id // empty' <<< "$create_json" || true)"
-        fi
+    if [[ -n "$tabid" ]]; then
+        herdr_sock_cmd "$sock" tab focus "$tabid" >/dev/null || true
         return 0
     fi
-    herdr_sock_cmd "$sock" tab focus "$tabid" >/dev/null || true
+    create_json="$(herdr_sock_cmd "$sock" tab create --workspace "$wsid" --label "$role" --focus || true)"
+    if [[ "$role" == editor ]]; then
+        herdr_run_editor "$sock" "$(jq -r '.result.root_pane.pane_id // empty' <<< "$create_json" || true)"
+    fi
+}
+
+tmux_focus_target() {
+    local session="$1" ctx="$2" role="$3" window cur repo dir exists=0
+    tmux has-session -t "$session" 2>/dev/null && exists=1
+    if [[ "$ctx" == Admin ]]; then
+        window=term
+        dir="$(ctx_default_repo_dir "$ctx")"
+    elif [[ "$role" == repo:* ]]; then
+        repo="${role#repo:}"
+        window="$repo/term"
+        dir="$(ctx_repo_dir "$ctx" "$repo")" || return 1
+    else
+        cur="$(tmux display-message -p -t "$session" '#{window_name}' 2>/dev/null || true)"
+        repo="${cur%%/*}"
+        [[ -n "$repo" && "$cur" == */* ]] || repo="$(ctx_default_repo_label "$ctx")"
+        window="$repo/$role"
+        dir="$(ctx_repo_dir "$ctx" "$repo")" || dir="$(ctx_default_repo_dir "$ctx")"
+    fi
+    if ! tmux list-windows -F '#{window_name}' -t "$session" 2>/dev/null | grep -Fxq -- "$window"; then
+        if ((exists)); then
+            if [[ "$window" == */editor ]]; then
+                tmux new-window -d -t "$session" -c "$dir" -n "$window" nvim
+            else
+                tmux new-window -d -t "$session" -c "$dir" -n "$window"
+            fi
+        elif [[ "$window" == */editor ]]; then
+            tmux new-session -d -s "$session" -c "$dir" -n "$window" nvim
+        else
+            tmux new-session -d -s "$session" -c "$dir" -n "$window"
+        fi
+    fi
+    tmux select-window -t "${session}:${window}" 2>/dev/null || true
 }
 
 # Land on a role from outside the card: herdr tab focus over the session
 # socket, or tmux select-window in the fallback backend.
 deep_link_role() {
-    local ctx="$1" role="$2" session window repo cur
+    local ctx="$1" role="$2" session
     session="$(role_session_name "$ctx" "$role")" || return 0
     if [[ "${SESSION_BACKEND:-herdr}" == "herdr" ]] && command -v herdr >/dev/null 2>&1; then
         herdr_focus_role_tab "$session" "$ctx" "$role"
     elif command -v tmux >/dev/null 2>&1; then
-        if [[ "$ctx" == "Admin" ]]; then
-            window=term
-        elif [[ "$role" == repo:* ]]; then
-            window="${role#repo:}/editor"
-        else
-            cur="$(tmux display-message -p -t "$session" '#{window_name}' 2>/dev/null || true)"
-            repo="${cur%%/*}"
-            [[ -n "$repo" && "$cur" == */* ]] || repo="$(ctx_default_repo_label "$ctx")"
-            window="$repo/$role"
+        if [[ "${SESSION_BACKEND:-herdr}" == "herdr" ]] \
+            && ! tmux has-session -t "$session" 2>/dev/null; then
+            return 0
         fi
-        tmux select-window -t "${session}:${window}" 2>/dev/null \
-            || tmux select-window -t "${session}:${role}" 2>/dev/null || true
+        tmux_focus_target "$session" "$ctx" "$role"
     fi
 }
 
@@ -804,16 +779,29 @@ herdr_session_exists() {
         <<< "$sessions_json" >/dev/null 2>&1
 }
 
-# Bootstrap a FRESH work session in the background once its socket appears:
-# adopt w1 as the default repo's workspace (its default tab, a fresh shell,
-# becomes the editor tab running nvim), converge the full repo/tab layout,
-# then land on the requested role. Every step is idempotent and best-effort
-# so a half-bootstrapped session converges on the next open.
-arm_herdr_bootstrap() {
+herdr_session_running() {
+    local session="$1" sessions_json
+    herdr_session_name_valid "$session" || return 1
+    sessions_json="$(herdr session list --json 2>/dev/null)" || return 1
+    jq -e --arg session "$session" \
+        'any(.sessions[]?; .name == $session and .running == true)' \
+        <<< "$sessions_json" >/dev/null 2>&1
+}
+
+# For an explicit role on a fresh session, adopt only Herdr's known-fresh
+# initial workspace/tab. Plain `all` attaches directly and leaves them alone.
+arm_herdr_target() {
     local session="$1" ctx="$2" role="$3" sock label
+    [[ "$role" != all ]] || return 0
     herdr_session_name_valid "$session" || return 0
     sock="$(herdr_sock_for_session "$session")"
-    label="$(ctx_default_repo_label "$ctx")"
+    if [[ "$role" == repo:* ]]; then
+        label="${role#repo:}"
+    elif [[ "$ctx" == Admin ]]; then
+        label=term
+    else
+        label="$(ctx_default_repo_label "$ctx")"
+    fi
     (
         local pane tabid
         for _ in $(seq 1 50); do
@@ -822,35 +810,57 @@ arm_herdr_bootstrap() {
         done
         [[ -S "$sock" ]] || exit 0
         sleep 0.5
-        herdr_sock_cmd "$sock" workspace rename w1 "$label" >/dev/null || true
-        [[ "$ctx" == "Admin" ]] && exit 0
-        # herdr's socket CLI replies in JSON (verified live on herdr 0.7.1):
-        # tab list → {"result":{"tabs":[{"tab_id":"w1:t1",...}]}}
+        herdr_sock_cmd "$sock" workspace rename w1 "$label" >/dev/null || exit 0
+        [[ "$role" == repo:* ]] && exit 0
         tabid="$(herdr_sock_cmd "$sock" tab list --workspace w1 \
             | jq -r '.result.tabs[0].tab_id // empty' 2>/dev/null || true)"
-        [[ -n "$tabid" ]] && herdr_sock_cmd "$sock" tab rename "$tabid" editor >/dev/null || true
-        pane="$(herdr_sock_cmd "$sock" pane list --workspace w1 \
-            | jq -r '.result.panes[0].pane_id // empty' 2>/dev/null || true)"
-        herdr_run_editor "$sock" "$pane"
-        herdr_ensure_layout "$session" "$ctx"
+        [[ -n "$tabid" ]] || exit 0
+        herdr_sock_cmd "$sock" tab rename "$tabid" "$role" >/dev/null || exit 0
+        if [[ "$role" == editor ]]; then
+            pane="$(herdr_sock_cmd "$sock" pane list --workspace w1 \
+                | jq -r '.result.panes[0].pane_id // empty' 2>/dev/null || true)"
+            herdr_run_editor "$sock" "$pane"
+        fi
+    ) >/dev/null 2>&1 &
+}
+
+# A stopped persisted session has no socket until Herdr restores it. Wait for
+# that restore, then apply only the explicit target; never adopt or rename its
+# existing workspaces/tabs as though they were fresh.
+arm_herdr_restored_target() {
+    local session="$1" ctx="$2" role="$3" sock
+    [[ "$role" != all ]] || return 0
+    herdr_session_name_valid "$session" || return 0
+    sock="$(herdr_sock_for_session "$session")"
+    (
+        for _ in $(seq 1 50); do
+            if [[ -S "$sock" ]] && herdr_sock_cmd "$sock" workspace list >/dev/null 2>&1; then
+                break
+            fi
+            sleep 0.2
+        done
+        [[ -S "$sock" ]] || exit 0
         herdr_focus_role_tab "$session" "$ctx" "$role"
     ) >/dev/null 2>&1 &
 }
 
 try_herdr_attach() {
-    local session="$1" ctx="$2" role="$3" fresh=0 rc started ended
+    local session="$1" ctx="$2" role="$3" fresh=0 running=0 rc started ended
     herdr_session_name_valid "$session" || {
         log_line "invalid herdr session name session=$session role=$role"
         return 1
     }
     if ! herdr_session_exists "$session"; then
         fresh=1
+    elif herdr_session_running "$session"; then
+        running=1
     fi
     if ((fresh)); then
-        arm_herdr_bootstrap "$session" "$ctx" "$role"
-    else
-        herdr_ensure_layout "$session" "$ctx"
+        arm_herdr_target "$session" "$ctx" "$role"
+    elif [[ "$role" != all ]] && ((running)); then
         herdr_focus_role_tab "$session" "$ctx" "$role"
+    elif [[ "$role" != all ]]; then
+        arm_herdr_restored_target "$session" "$ctx" "$role"
     fi
     started="$(date +%s)"
     set +e
@@ -883,11 +893,18 @@ run_tmux_role() {
     fi
     role="$(normalize_role "$role")"
     case "$role" in
-        editor|agents|logs|term|repo:*) ;;
+        all|editor|agents|logs|term|repo:*) ;;
         *) printf 'unknown terminal role: %s\n' "$role" >&2; exit 2 ;;
     esac
     unset TMUX TMUX_PANE
-    dir="$(ctx_default_repo_dir "$ctx")"
+    if [[ "$role" == repo:* ]]; then
+        dir="$(ctx_repo_dir "$ctx" "${role#repo:}")" || {
+            printf 'unknown repo for %s: %s\n' "$ctx" "${role#repo:}" >&2
+            exit 2
+        }
+    else
+        dir="$(ctx_default_repo_dir "$ctx")"
+    fi
     cd "$dir" 2>/dev/null || cd "$HOME"
     printf '\033]0;%s\007' "$(terminal_title "$ctx" "$role")"
     session="$(role_session_name "$ctx" "$role")"

@@ -176,7 +176,12 @@ pub fn converge_loop(
     let mut remaining = Vec::new();
     for iteration in 1..=cfg.behavior.converge_iters {
         let state = snapshot_state_with_client(cfg, client)?;
-        maybe_deep_link(cfg, &state, goal, sessions)?;
+        // Existing work cards are deep-linked here. A newly spawned card owns
+        // its attach/bootstrap through --tmux-role, so do not race it on a
+        // later convergence pass.
+        if iteration == 1 {
+            maybe_deep_link(cfg, &state, goal, sessions)?;
+        }
         let effects = plan(cfg, &state, goal)?;
         if effects.is_empty() {
             return Ok(if iteration == 1 { 1 } else { iteration - 1 });
@@ -272,17 +277,12 @@ fn maybe_deep_link(
         return Ok(());
     };
     let ctx = resolve_context_arg(cfg, state, *ctx)?;
-    let role = if *role == Role::All {
-        cfg.terminal_role_for_open_all(ctx)
-    } else {
-        role.clone()
-    };
-    if matches!(role, Role::Docs | Role::Output) {
+    if matches!(role, Role::All | Role::Docs | Role::Output) {
         return Ok(());
     }
     let app_id = cfg.work_app_id(ctx)?;
     if state.oldest_window_by_app_id(&app_id).is_some() {
-        sessions.ensure_and_deep_link(cfg, ctx, &role)?;
+        sessions.deep_link(cfg, ctx, role)?;
     }
     Ok(())
 }
@@ -552,6 +552,10 @@ mod tests {
 
         assert_eq!(iterations, 1);
         assert!(launcher.spawns.is_empty());
+        assert!(
+            sessions.calls.is_empty(),
+            "plain open touched session internals"
+        );
     }
 
     #[test]
@@ -749,32 +753,88 @@ mod tests {
         assert_eq!(
             sessions.calls,
             vec![
-                "ensure:UP-work:agents",
-                "rename-workspace:editor:mono",
-                "rename-tab:mono:1:editor",
+                "target:UP-work:agents",
+                "create-workspace:mono",
                 "create-tab:mono:agents",
-                "create-tab:mono:logs",
                 "focus-tab:mono:agents"
             ]
         );
         assert_eq!(
             sessions.workspaces.get("mono"),
-            Some(&vec![
-                "editor".to_string(),
-                "agents".to_string(),
-                "logs".to_string()
-            ])
+            Some(&vec!["1".to_string(), "agents".to_string()])
+        );
+        assert_eq!(
+            sessions.workspaces.get("editor"),
+            Some(&vec!["1".to_string()]),
+            "ordinary deep link must not rename legacy workspaces"
         );
 
         sessions.calls.clear();
         sessions
-            .ensure_and_deep_link(&cfg, Context::Admin, &Role::Term)
+            .deep_link(&cfg, Context::Admin, &Role::Term)
             .expect("admin session");
         assert_eq!(
             sessions.calls,
-            vec!["ensure:Admin-work:term", "admin-focus:term"]
+            vec!["target:Admin-work:term", "focus-workspace:term"]
         );
         assert_eq!(sessions.focused_workspace.as_deref(), Some("term"));
+    }
+
+    #[test]
+    fn spawned_explicit_role_is_not_deep_linked_again_by_rust() {
+        let _guard = ENV_LOCK.lock().unwrap_or_else(|err| err.into_inner());
+        let temp = tempfile::tempdir().expect("tempdir");
+        set_cache_dir(&temp);
+        let cfg = cfg();
+        let mut client = FakeNiriClient::new(base_workspaces(), vec![]);
+        let mut launcher = FakeLauncher::default();
+        let mut sessions = FakeSessionBackend::default();
+
+        converge_loop(
+            &cfg,
+            &Goal::Open {
+                ctx: ContextArg::Context(Context::UP),
+                role: Role::Agents,
+            },
+            "open",
+            &mut client,
+            &mut launcher,
+            &mut sessions,
+        )
+        .expect("converged");
+
+        assert_eq!(launcher.spawns.len(), 1);
+        assert!(
+            sessions.calls.is_empty(),
+            "the terminal attach path exclusively owns fresh-session targeting"
+        );
+    }
+
+    #[test]
+    fn explicit_editor_does_not_adopt_an_existing_numbered_tab() {
+        let cfg = cfg();
+        let mut sessions = FakeSessionBackend::default();
+        sessions
+            .workspaces
+            .insert("mono".to_string(), vec!["1".to_string()]);
+        sessions.focused_workspace = Some("mono".to_string());
+
+        sessions
+            .deep_link(&cfg, Context::UP, &Role::Editor)
+            .expect("editor deep link");
+
+        assert_eq!(
+            sessions.workspaces.get("mono"),
+            Some(&vec!["1".to_string(), "editor".to_string()])
+        );
+        assert_eq!(
+            sessions.calls,
+            vec![
+                "target:UP-work:editor",
+                "create-tab:mono:editor",
+                "focus-tab:mono:editor"
+            ]
+        );
     }
 
     #[test]

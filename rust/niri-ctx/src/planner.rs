@@ -248,8 +248,7 @@ fn plan_open_all(cfg: &Config, state: &DesktopState, ctx: Context) -> Result<Vec
         BrowserRole::Docs,
         false,
     )?);
-    let work_role = cfg.terminal_role_for_open_all(ctx);
-    effects.extend(plan_work_card(cfg, state, ctx, &work_role, false)?);
+    effects.extend(plan_work_card(cfg, state, ctx, &Role::All, false)?);
 
     let ctx_cfg = cfg
         .context(ctx)
@@ -1005,9 +1004,13 @@ mod tests {
         assert!(effects
             .iter()
             .any(|effect| matches!(effect, Effect::SpawnBrowser { .. })));
-        assert!(effects
-            .iter()
-            .any(|effect| matches!(effect, Effect::SpawnTerminal { .. })));
+        assert!(effects.iter().any(|effect| matches!(
+            effect,
+            Effect::SpawnTerminal {
+                role: Role::All,
+                ..
+            }
+        )));
         assert_eq!(
             effects
                 .iter()

@@ -25,6 +25,14 @@ export GPG_TTY=$(tty)
 # ---------- Starship ----------
 export STARSHIP_CONFIG="$ZDOTDIR/starship.toml"
 
+# Java shit
+export JAVA_HOME=/usr/lib/jvm/java-17-openjdk
+export ANDROID_HOME="$HOME/Android/Sdk"
+export PATH="$PATH:$ANDROID_HOME/emulator:$ANDROID_HOME/platform-tools"
+
+# Google's Linux emulator bundle ships xcb but no Qt Wayland plugin.
+export QT_QPA_PLATFORM=xcb
+
 # ---------- PATH ----------
 # Personal binaries/scripts
 export PATH="$HOME/.local/bin:$PATH"

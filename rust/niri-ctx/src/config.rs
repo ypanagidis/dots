@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use crate::error::{NiriCtxError, Result};
-use crate::model::{Context, Role};
+use crate::model::Context;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Config {
@@ -228,14 +228,6 @@ impl Config {
             .context(ctx)
             .ok_or_else(|| NiriCtxError::UnknownContext(ctx.to_string()))?;
         Ok(format!("dev.yiannis.niri.{}.work", cfg.slug))
-    }
-
-    pub fn terminal_role_for_open_all(&self, ctx: Context) -> Role {
-        if ctx == Context::Admin {
-            Role::Term
-        } else {
-            Role::Editor
-        }
     }
 
     pub fn write_frozen_toml(&self) -> Result<PathBuf> {
