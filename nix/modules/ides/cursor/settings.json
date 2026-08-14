@@ -1,0 +1,127 @@
+{
+  "editor.fontSize": 18,
+  "terminal.integrated.fontSize": 18,
+  "workbench.activityBar.location": "bottom",
+  "workbench.editor.labelFormat": "default",
+  "breadcrumbs.enabled": true,
+  "editor.lineNumbers": "relative",
+  "editor.minimap.enabled": false,
+  "editor.stickyScroll.enabled": true,
+  "editor.suggest.insertMode": "replace",
+  "extensions.autoUpdate": "onlyEnabledExtensions",
+  "typescript.preferences.importModuleSpecifier": "project-relative",
+  "typescript.updateImportsOnFileMove.enabled": "always",
+
+  "typescript.experimental.useTsgo": true,
+  "typescript.tsserver.maxTsServerMemory": 8192,
+
+  "vim.foldfix": true,
+  "vim.highlightedyank.enable": true,
+  "vim.hlsearch": true,
+  "vim.visualstar": true,
+  "vim.leader": "<space>",
+  "vim.useSystemClipboard": true,
+
+  "workbench.settings.editor": "json",
+  "workbench.sideBar.location": "right",
+  "workbench.startupEditor": "none",
+  "editor.formatOnSave": true,
+  "vim.surround": true,
+  "redhat.telemetry.enabled": false,
+  "json.schemaDownload.enable": true,
+  "terminal.integrated.allowChords": true,
+  "editor.occurrencesHighlight": "off",
+  "editor.gotoLocation.multipleDefinitions": "goto",
+  "editor.wordWrap": "on",
+
+  "typescript.tsserver.log": "off",
+  "editor.fontFamily": "'JetBrains Mono', 'Droid Sans Mono', monospace",
+  "editor.accessibilitySupport": "off",
+  "editor.wordBasedSuggestions": "off",
+  "cursor.composer.shouldChimeAfterChatFinishes": true,
+  "workbench.colorTheme": "Ayu Mirage",
+
+  "vim.insertModeKeyBindingsNonRecursive": [
+    { "after": ["<esc>"], "before": ["j", "k"] },
+    { "before": ["<ctrl", "k"], "after": ["<ctrl", "p>"] }
+  ],
+  "vim.normalModeKeyBindingsNonRecursive": [
+    {
+      "before": ["<leader>", "f", "f"],
+      "commands": ["workbench.action.quickOpen"]
+    },
+    {
+      "before": ["<leader>", "g", "i"],
+      "commands": ["editor.action.referenceSearch.trigger"]
+    },
+    {
+      "before": ["<leader>", "f", "F"],
+      "commands": ["workbench.action.quickOpen"]
+    },
+    {
+      "before": ["g", "d"],
+      "commands": ["editor.action.revealDefinition", "cancelSelection"]
+    },
+    {
+      "before": ["g", "r"],
+      "commands": ["editor.action.revealImp", "cancelSelection"]
+    },
+    {
+      "before": ["<leader>", "s"],
+      "commands": ["workbench.action.files.save"]
+    },
+    { "before": ["]", "d"], "commands": ["editor.action.marker.next"] },
+    {
+      "before": ["<leader>", "c", "a"],
+      "commands": ["editor.action.quickFix"]
+    },
+    { "before": ["<leader>", "n", "h"], "commands": [":nohl"] },
+    { "before": ["<C-d>"], "after": ["<C-d>", "z", "z"] },
+    { "before": ["<C-u>"], "after": ["<C-u>", "z", "z"] },
+    { "before": ["<leader>", "f"], "commands": ["workbench.action.quickOpen"] },
+    {
+      "before": ["<leader>", "w", "v"],
+      "commands": ["workbench.action.splitEditor"]
+    },
+    {
+      "before": ["<leader>", "w", "-"],
+      "commands": ["workbench.action.splitEditorDown"]
+    },
+    {
+      "before": ["<leader>", "w", "d"],
+      "commands": ["workbench.action.closeEditorsInGroup"]
+    },
+    {
+      "before": ["<leader>", "b", "d"],
+      "commands": ["workbench.action.closeActiveEditor"]
+    },
+    {
+      "before": ["<leader>", "b", "o"],
+      "commands": ["workbench.action.closeOtherEditors"]
+    },
+    {
+      "before": ["<leader>", "s", "x"],
+      "commands": ["workbench.action.joinTwoGroups"]
+    }
+  ],
+  "vim.visualModeKeyBindingsNonRecursive": [
+    { "before": ["g", "s", "a", "'"], "after": ["S", "'"] },
+    { "before": ["g", "s", "a", "\""], "after": ["S", "\""] },
+    { "before": ["g", "s", "a", ")"], "after": ["S", ")"] },
+    { "before": ["g", "s", "a", "]"], "after": ["S", "]"] },
+    { "before": ["g", "s", "a", "}"], "after": ["S", "}"] },
+    { "before": ["g", "s", "a", "<"], "after": ["S", "<"] }
+  ],
+  "vim.visualModeKeyBindings": [
+    { "before": [">"], "commands": ["editor.action.indentLines"] },
+    { "before": ["<"], "commands": ["editor.action.outdentLines"] }
+  ],
+
+  "[jsonc]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+  "[dockercompose]": { "editor.defaultFormatter": "redhat.vscode-yaml" },
+  "[github-actions-workflow]": {
+    "editor.defaultFormatter": "redhat.vscode-yaml"
+  },
+  "[astro]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+  "nix.enableLanguageServer": true
+}

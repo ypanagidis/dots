@@ -1,0 +1,213 @@
+{
+  "editor.fontSize": 19,
+  "terminal.external.linuxExec": "konsole",
+  "terminal.integrated.fontSize": 19,
+  "workbench.activityBar.location": "bottom",
+  "workbench.editor.labelFormat": "default",
+  "breadcrumbs.enabled": true,
+  "editor.lineNumbers": "relative",
+  "editor.minimap.enabled": false,
+  "editor.stickyScroll.enabled": true,
+  "editor.suggest.insertMode": "replace",
+  "extensions.autoUpdate": "onlyEnabledExtensions",
+  "sortJSON.orderOverride": ["name", "version", "description"],
+  "sortJSON.orderUnderride": ["dependencies", "devDependencies"],
+  "typescript.preferences.importModuleSpecifier": "project-relative",
+  "typescript.updateImportsOnFileMove.enabled": "always",
+  "vim.foldfix": true,
+  "vim.highlightedyank.enable": true,
+  "vim.hlsearch": true,
+  "vim.visualstar": true,
+  "vim.insertModeKeyBindingsNonRecursive": [
+    {
+      "after": ["<esc>"],
+      "before": ["j", "k"]
+    },
+    { "before": ["<ctrl, k"], "after": ["<ctrl, p>"] }
+  ],
+  "vim.leader": "<space>",
+  "vim.normalModeKeyBindingsNonRecursive": [
+    {
+      "before": ["<leader>", "f", "f"],
+      "commands": ["workbench.action.quickOpen"]
+    },
+    {
+      "before": ["<leader>", "g", "i"],
+      "commands": ["editor.action.referenceSearch.trigger"]
+    },
+    {
+      "before": ["<leader>", "f", "F"],
+      "commands": ["workbench.action.quickOpen"]
+    },
+    {
+      "before": ["g", "d"],
+      "commands": ["editor.action.revealDefinition", "cancelSelection"]
+    },
+    {
+      "before": ["g", "r"],
+      "commands": ["editor.action.revealImp", "cancelSelection"]
+    },
+    {
+      "before": ["<leader>", "s"],
+      "commands": ["workbench.action.files.save"]
+    },
+    // {
+    //   "before": ["<leader>", "q"],
+    //   "commands": [":q"]
+    // },
+    {
+      "before": ["]", "d"],
+      "commands": ["editor.action.marker.next"]
+    },
+    {
+      "before": ["<leader>", "c", "a"],
+      "commands": ["editor.action.quickFix"]
+    },
+    {
+      "before": ["<leader>", "n", "h"],
+      "commands": [":nohl"]
+    },
+    {
+      "before": ["<C-d>"],
+      "after": ["<C-d>", "z", "z"]
+    },
+    {
+      "before": ["<C-u>"],
+      "after": ["<C-u>", "z", "z"]
+    },
+    {
+      "before": ["<leader>", "f"],
+      "commands": ["workbench.action.quickOpen"]
+    },
+    {
+      "before": ["<leader>", "w", "v"],
+      "commands": ["workbench.action.splitEditor"]
+    },
+    {
+      "before": ["<leader>", "w", "-"],
+      "commands": ["workbench.action.splitEditorDown"]
+    },
+    {
+      "before": ["<leader>", "w", "d"],
+      "commands": ["workbench.action.closeEditorsInGroup"]
+    },
+    // {
+    // 	"before": ["<C-i>"],
+    // 	"commands": ["workbench.action.toggleMaximizedPanel"]
+    // },
+    {
+      "before": ["<leader>", "b", "d"],
+      "commands": ["workbench.action.closeActiveEditor"]
+    },
+    {
+      "before": ["<leader>", "b", "o"],
+      "commands": ["workbench.action.closeOtherEditors"]
+    },
+    {
+      "before": ["<leader>", "s", "x"],
+      "commands": ["workbench.action.joinTwoGroups"]
+    }
+  ],
+  "vim.visualModeKeyBindingsNonRecursive": [
+    // gs a '  -> surround selection with single quotes
+    { "before": ["g", "s", "a", "'"], "after": ["S", "'"] },
+
+    // gs a "  -> surround selection with double quotes
+    { "before": ["g", "s", "a", "\""], "after": ["S", "\""] },
+
+    // gs a )  -> surround selection with (...)
+    { "before": ["g", "s", "a", ")"], "after": ["S", ")"] },
+
+    // gs a ]  -> surround selection with [...]
+    { "before": ["g", "s", "a", "]"], "after": ["S", "]"] },
+
+    // gs a }  -> surround selection with {...}
+    { "before": ["g", "s", "a", "}"], "after": ["S", "}"] },
+    // gs a }  -> surround selection with {...}
+    { "before": ["g", "s", "a", "<"], "after": ["S", "<"] }
+  ],
+  "vim.useSystemClipboard": true,
+  "workbench.settings.editor": "json",
+  "workbench.sideBar.location": "left",
+  "workbench.startupEditor": "none",
+  "editor.codeActionsOnSave": {
+    // "source.organizeImports": "always",
+    // "source.organizeImports.biome": "always"
+    // "source.fixAll.biome": "always"
+  },
+  // "[javascript]": {
+  // 	"editor.defaultFormatter": "biomejs.biome"
+  // },
+  // "[typescriptreact]": {
+  // 	"editor.defaultFormatter": "biomejs.biome"
+  // },
+  // "[javascriptreact]": {
+  // 	"editor.defaultFormatter": "biomejs.biome"
+  // },
+  // "[typescript]": {
+  // 	"editor.defaultFormatter": "biomejs.biome"
+  // },
+  // "[json]": {
+  // 	"editor.defaultFormatter": "biomejs.biome"
+  // },
+  "editor.formatOnSave": true,
+  "vim.visualModeKeyBindings": [
+    {
+      "before": [">"],
+      "commands": ["editor.action.indentLines"]
+    },
+    {
+      "before": ["<"],
+      "commands": ["editor.action.outdentLines"]
+    }
+  ],
+  "vim.surround": true,
+  "redhat.telemetry.enabled": false,
+  "[jsonc]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "json.schemaDownload.enable": true,
+  "typescript.tsserver.maxTsServerMemory": 8192,
+  "terminal.integrated.allowChords": true,
+
+  "editor.occurrencesHighlight": "off",
+  "editor.gotoLocation.multipleDefinitions": "goto",
+  "editor.wordWrap": "on",
+  "typescript.tsserver.nodePath": "/etc/profiles/per-user/yiannis/bin/node",
+  "typescript.tsserver.log": "off",
+  "amp.url": "https://ampcode.com/",
+  "editor.fontFamily": "Menlo",
+  "[dockercompose]": {
+    "editor.insertSpaces": true,
+    "editor.tabSize": 2,
+    "editor.autoIndent": "advanced",
+    "editor.quickSuggestions": {
+      "other": true,
+      "comments": false,
+      "strings": true
+    },
+    "editor.defaultFormatter": "redhat.vscode-yaml"
+  },
+  "[github-actions-workflow]": {
+    "editor.defaultFormatter": "redhat.vscode-yaml"
+  },
+  "editor.accessibilitySupport": "off",
+  "remote.SSH.remotePlatform": {
+    "yiannis@get-movies.mine": "linux",
+    "yiannis@192.168.1.135": "linux"
+  },
+  "[astro]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "editor.wordBasedSuggestions": "off",
+  "biome.lsp.bin": "./node_modules/.bin/biome",
+  "typescript.experimental.useTsgo": true,
+  "cursor.composer.shouldChimeAfterChatFinishes": true,
+  "workbench.colorTheme": "Vesper",
+  "window.restoreWindows": "all",
+  "window.openFoldersInNewWindow": "off",
+  "window.openFilesInNewWindow": "off",
+  "window.openWithoutArgumentsInNewWindow": "off",
+  "security.promptForRemoteFileProtocolHandling": false,
+  "workbench.iconTheme": "ayu"
+}

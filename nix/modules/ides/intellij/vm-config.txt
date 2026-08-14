@@ -1,0 +1,11 @@
+-Dawt.toolkit.name=WLToolkit
+
+-Xms2G
+-Xmx16g
+-XX:ReservedCodeCacheSize=1g
+
+-Dsun.java2d.opengl=false
+-Dsun.java2d.renderer=sun.java2d.marlin.MarlinRenderingEngine
+-Dprism.order=sw
+-Dsun.io.useCanonCaches=false
+-Dsun.java2d.uiScale.enabled=true

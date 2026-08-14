@@ -1,0 +1,22 @@
+# 1. Enable Native Wayland
+-Dawt.toolkit.name=WLToolkit
+
+# 2. Memory Settings (Your 16GB Config)
+-Xms2G
+-Xmx16g
+-XX:ReservedCodeCacheSize=1g
+
+# 3. Graphics Rendering Tweaks (NVIDIA OPTIMIZED)
+# WARNING: Set opengl to FALSE for Nvidia. True often causes stutter/flickering.
+-Dsun.java2d.opengl=false
+# Use the software renderer for Java2D (More stable on Nvidia Wayland)
+-Dsun.java2d.renderer=sun.java2d.marlin.MarlinRenderingEngine
+
+# 4. Fix potential font rendering lag
+-Dprism.order=sw
+
+# 5. Nvidia/Wayland specific helpers
+# prevents filesystem polling lag
+-Dsun.io.useCanonCaches=false 
+# Fixes fractional scaling issues if you have a 4k monitor
+-Dsun.java2d.uiScale.enabled=true
