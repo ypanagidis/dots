@@ -24,6 +24,15 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    # Helium browser, repackaged from upstream release binaries. The flake's
+    # CI bumps version/hash on every Helium release, so updates ride
+    # `nix flake update helium-flake` — replaces the old local pin + uh.
+    # Swap for pkgs.helium-browser once the pending nixpkgs PR lands.
+    helium-flake = {
+      url = "github:oxcl/nix-flake-helium-browser";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     # Terminal session daemon (zero-loss reattach when the terminal dies).
     # Config is dots/.config/herdr via dots.nix; kept on its own nixpkgs pin
     # since it builds with a rust-overlay toolchain.

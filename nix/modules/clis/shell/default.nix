@@ -127,18 +127,12 @@ in
         cd "$original_dir"
       }
 
+      # Helium now comes from the helium-flake input (auto-bumped upstream);
+      # update with: nix flake update helium-flake && rebuild
       uh() {
-        local original_dir="$PWD"
-        cd ${flakeDir}/modules/browsers/helium || return 1
-
-        if ./update-helium.sh "$@"; then
-          echo "Rebuilding..."
-          ${rebuild}
-        else
-          echo "No update needed or fetch failed"
-        fi
-
-        cd "$original_dir"
+        cd ${flakeDir} || return 1
+        nix flake update helium-flake && ${rebuild}
+        cd - >/dev/null
       }
 
       ut3() {

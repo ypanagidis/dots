@@ -1,16 +1,23 @@
-{ pkgs, lib, ... }:
+{
+  pkgs,
+  lib,
+  inputs,
+  ...
+}:
 
-lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
-  home.packages = [
-    (pkgs.callPackage ./helium.nix { })
-  ];
+{
+  imports = [ inputs.helium-flake.homeModules.default ];
 
-  xdg.mimeApps = {
-    enable = true;
-    defaultApplications = {
-      "text/html" = "helium.desktop";
-      "x-scheme-handler/http" = "helium.desktop";
-      "x-scheme-handler/https" = "helium.desktop";
+  config = lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
+    programs.helium.enable = true;
+
+    xdg.mimeApps = {
+      enable = true;
+      defaultApplications = {
+        "text/html" = "helium.desktop";
+        "x-scheme-handler/http" = "helium.desktop";
+        "x-scheme-handler/https" = "helium.desktop";
+      };
     };
   };
 }

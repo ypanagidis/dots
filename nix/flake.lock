@@ -209,6 +209,26 @@
         "type": "github"
       }
     },
+    "helium-flake": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1786621994,
+        "narHash": "sha256-ygaOQQFGv3QHcNMoGBor22Dm5GouzmwYucrUfX6oTxQ=",
+        "owner": "oxcl",
+        "repo": "nix-flake-helium-browser",
+        "rev": "810640b8a7aa504d3962ec8bb857f8252aad6547",
+        "type": "github"
+      },
+      "original": {
+        "owner": "oxcl",
+        "repo": "nix-flake-helium-browser",
+        "type": "github"
+      }
+    },
     "hercules-ci-effects": {
       "inputs": {
         "flake-parts": "flake-parts",
@@ -531,6 +551,7 @@
       "inputs": {
         "custom-packages": "custom-packages",
         "disko": "disko",
+        "helium-flake": "helium-flake",
         "herdr": "herdr",
         "home-manager": "home-manager",
         "llm-agents": "llm-agents",
