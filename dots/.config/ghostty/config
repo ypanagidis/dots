@@ -28,6 +28,9 @@ background-opacity-cells = true
 background-blur = true
 window-padding-x = 10
 window-padding-y = 8
+# No titlebar. Default (auto) means server-side decorations under KDE;
+# niri never drew them, which is why this was never needed before.
+window-decoration = none
 
 # Let Herdr use Ctrl-Shift-J for next-agent navigation.
 keybind = ctrl+shift+j=unbind
