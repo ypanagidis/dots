@@ -175,9 +175,17 @@ in
         "Alt+F1"
         "Alt+Space"
       ];
-      # Hyper+A/C moved to the kde-ctx launchers (hotkeys.commands below).
-      plasmashell."activate task manager entry 1" = "Meta+1";
-      plasmashell."activate task manager entry 2" = "Meta+2";
+      # Hyper+A/C = taskbar entries 1/2 (helium/ghostty): focus the existing
+      # window in this activity, or launch. Context-aware FIRST opens are the
+      # kde-ctx binds (Hyper+Return/B) below.
+      plasmashell."activate task manager entry 1" = [
+        "Meta+1"
+        "Meta+Ctrl+Alt+Shift+A"
+      ];
+      plasmashell."activate task manager entry 2" = [
+        "Meta+2"
+        "Meta+Ctrl+Alt+Shift+C"
+      ];
       plasmashell."activate task manager entry 3" = [
         "Meta+3"
         "Meta+Ctrl+Alt+Shift+D"
@@ -231,16 +239,17 @@ in
     # Meta+Shift+S: draw a region, image lands on the clipboard, no window —
     # same flow as the old grim/slurp binding on niri. (-r region, -b no GUI,
     # -c clipboard)
-    # Context launchers (niri muscle memory): Hyper+C terminal on the current
-    # desktop, Hyper+A browser on the NEXT desktop of the active screen.
+    # Context FIRST-open launchers: always spawn a fresh window wired to the
+    # current activity (herdr session / helium profile). Day-to-day focusing
+    # goes through the Hyper+A/C taskbar binds above.
     hotkeys.commands.kde-ctx-term = {
       name = "Context terminal (herdr work session)";
-      key = "Meta+Ctrl+Alt+Shift+C";
+      key = "Meta+Ctrl+Alt+Shift+Return";
       command = "/home/yiannis/.local/bin/kde-ctx term";
     };
     hotkeys.commands.kde-ctx-browser = {
       name = "Context browser (helium profile)";
-      key = "Meta+Ctrl+Alt+Shift+A";
+      key = "Meta+Ctrl+Alt+Shift+B";
       command = "/home/yiannis/.local/bin/kde-ctx browser";
     };
     hotkeys.commands.spectacle-region-clipboard = {
