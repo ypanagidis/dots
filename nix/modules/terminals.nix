@@ -1,46 +1,9 @@
-{ ... }:
+{ pkgs, dotsLink, ... }:
 
 {
-  # Linux-only main branch: the old Darwin Ghostty branch lives on the
-  # `multihost-config` branch now.
-  xdg.configFile."ghostty/themes/cyberdream".text = ''
-    # cyberdream theme for ghostty
-    palette = 0=#16181a
-    palette = 1=#ff6e5e
-    palette = 2=#5eff6c
-    palette = 3=#f1ff5e
-    palette = 4=#5ea1ff
-    palette = 5=#bd5eff
-    palette = 6=#5ef1ff
-    palette = 7=#ffffff
-    palette = 8=#3c4048
-    palette = 9=#ff6e5e
-    palette = 10=#5eff6c
-    palette = 11=#f1ff5e
-    palette = 12=#5ea1ff
-    palette = 13=#bd5eff
-    palette = 14=#5ef1ff
-    palette = 15=#ffffff
+  # Ghostty: the package is declared here, the config (incl. themes/) is the
+  # shared dots/ copy — same file the Arch install symlinks. See dots.nix.
+  home.packages = [ pkgs.ghostty ];
 
-    background = #16181a
-    foreground = #ffffff
-    cursor-color = #ffffff
-    selection-background = #3c4048
-    selection-foreground = #ffffff
-  '';
-
-  programs.ghostty = {
-    enable = true;
-    settings = {
-      font-size = 15;
-      theme = "cyberdream";
-      window-decoration = false;
-      gtk-titlebar = false;
-      copy-on-select = "clipboard";
-      keybind = [
-        "ctrl+,=unbind"
-        "ctrl+alt+o=open_config"
-      ];
-    };
-  };
+  xdg.configFile."ghostty".source = dotsLink ".config/ghostty";
 }
