@@ -43,6 +43,18 @@
         identitiesOnly = true;
         identityFile = "~/.ssh/id_ed25519";
       };
+      "sbx-*" = {
+        hostname = "localhost";
+        port = 2222;
+        identitiesOnly = true;
+        identityFile = "~/.ssh/id_ed25519_github";
+      };
+      personal_macbook = {
+        hostname = "Yianniss-MacBook-Pro.local";
+        user = "yiannis";
+        identitiesOnly = true;
+        identityFile = "~/.ssh/id_ed25519";
+      };
     };
   };
 }

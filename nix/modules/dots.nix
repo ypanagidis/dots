@@ -21,6 +21,8 @@ in
     "alacritty".source = link ".config/alacritty";
     "herdr".source = link ".config/herdr";
     "lazygit".source = link ".config/lazygit";
-    "git".source = link ".config/git";
+    # Only the ignore file — programs.git (clis/default.nix) owns
+    # .config/git/config, so linking the whole dir collides with HM.
+    "git/ignore".source = link ".config/git/ignore";
   };
 }

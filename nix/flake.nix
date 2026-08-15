@@ -68,6 +68,9 @@
           {
             home-manager.useGlobalPkgs = true;
             home-manager.useUserPackages = true;
+            # Leftover real files from the pre-NixOS backup restore get moved
+            # aside instead of aborting activation.
+            home-manager.backupFileExtension = "hm-bak";
             home-manager.extraSpecialArgs = { inherit inputs; };
             home-manager.sharedModules = [ inputs.plasma-manager.homeModules.plasma-manager ];
             home-manager.users.yiannis = import ./home.nix;
