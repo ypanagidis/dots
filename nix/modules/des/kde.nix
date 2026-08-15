@@ -236,6 +236,18 @@ in
     # Meta+Shift+S: draw a region, image lands on the clipboard, no window —
     # same flow as the old grim/slurp binding on niri. (-r region, -b no GUI,
     # -c clipboard)
+    # Context launchers: Hyper+Return/B open the current activity's herdr
+    # work terminal / helium profile (see dots/bin/kde-ctx).
+    hotkeys.commands.kde-ctx-term = {
+      name = "Context terminal (herdr work session)";
+      key = "Meta+Ctrl+Alt+Shift+Return";
+      command = "/home/yiannis/.local/bin/kde-ctx term";
+    };
+    hotkeys.commands.kde-ctx-browser = {
+      name = "Context browser (helium profile)";
+      key = "Meta+Ctrl+Alt+Shift+B";
+      command = "/home/yiannis/.local/bin/kde-ctx browser";
+    };
     hotkeys.commands.spectacle-region-clipboard = {
       name = "Region screenshot to clipboard";
       key = "Meta+Shift+S";
