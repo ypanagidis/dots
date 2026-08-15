@@ -14,7 +14,7 @@ appimageTools.wrapType2 {
   extraPkgs =
     pkgs: with pkgs; [
       libnotify
-      xorg.libxkbfile
+      libxkbfile
     ];
 
   meta = {

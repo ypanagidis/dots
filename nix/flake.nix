@@ -2,12 +2,25 @@
   description = "Yiannis' NixOS config";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
-    nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixos-unstable";
-    nixpkgs-master.url = "github:NixOS/nixpkgs/master";
+    # Track unstable for the whole system: this is what carries the newest
+    # KDE Plasma (6.7.x as of Aug 2026). Stable releases lag a full Plasma
+    # cycle behind.
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
     home-manager = {
-      url = "github:nix-community/home-manager/release-25.11";
+      url = "github:nix-community/home-manager";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    # One flake for every AI coding agent (claude-code, codex, opencode,
+    # gemini-cli, ...). Consumed directly via inputs.llm-agents.packages —
+    # deliberately NOT following our nixpkgs so numtide's binary cache hits.
+    llm-agents.url = "github:numtide/llm-agents.nix";
+
+    # Declarative partitioning; disk-config.nix replaces the filesystem half
+    # of hardware-configuration.nix.
+    disko = {
+      url = "github:nix-community/disko/latest";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
@@ -43,7 +56,8 @@
           {
             nixpkgs.overlays = [ custom-packages.overlays.default ];
           }
-          custom-packages.nixosModules.nordvpn
+          inputs.disko.nixosModules.disko
+          ./disk-config.nix
           ./configuration.nix
           home-manager.nixosModules.home-manager
           {

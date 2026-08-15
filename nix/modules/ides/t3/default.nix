@@ -1,6 +1,6 @@
 { pkgs, lib, ... }:
 
-lib.mkIf pkgs.stdenv.isLinux (
+lib.mkIf pkgs.stdenv.hostPlatform.isLinux (
   let
     version = "0.0.25-nightly.20260515.295";
     src = pkgs.fetchurl {

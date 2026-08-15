@@ -1,10 +1,10 @@
-{ pkgs, pkgsUnstable, ... }:
+{ pkgs, ... }:
 {
   programs.neovim = {
     enable = true;
-    package = pkgsUnstable.neovim-unwrapped;
+    package = pkgs.neovim-unwrapped;
 
-    extraLuaConfig =
+    initLua =
       builtins.readFile ./nvim/lua/options.lua + builtins.readFile ./nvim/lua/keymaps.lua;
 
     plugins = with pkgs.vimPlugins; [
@@ -38,7 +38,7 @@
 
       # Treesitter
       {
-        plugin = pkgsUnstable.vimPlugins.nvim-treesitter.withAllGrammars;
+        plugin = pkgs.vimPlugins.nvim-treesitter.withAllGrammars;
         type = "lua";
         config = builtins.readFile ./nvim/lua/plugins/treesitter.lua;
       }
@@ -150,7 +150,7 @@
 
       # VSCode-style git diff view
       {
-        plugin = pkgsUnstable.vimPlugins.codediff-nvim;
+        plugin = pkgs.vimPlugins.codediff-nvim;
         type = "lua";
         config = builtins.readFile ./nvim/lua/plugins/codediff.lua;
       }
@@ -189,7 +189,7 @@
 
       # Formatters
       prettierd
-      nodePackages.prettier
+      prettier
       stylua
       nixfmt-rfc-style
       go

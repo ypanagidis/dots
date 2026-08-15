@@ -4,25 +4,13 @@
   ...
 }:
 
-let
-  pkgsUnstable = import inputs.nixpkgs-unstable {
-    inherit (pkgs) system;
-    config = pkgs.config;
-  };
-  pkgsMaster = import inputs.nixpkgs-master {
-    inherit (pkgs) system;
-    config = pkgs.config;
-  };
-in
-
 {
   # Home Manager entrypoint. Keep long package lists in imported modules so this
   # file only explains the shape of the user environment.
-  _module.args.pkgsUnstable = pkgsUnstable;
-  _module.args.pkgsMaster = pkgsMaster;
-
   imports = [
+    ./modules/dots.nix
     ./modules/dev/base.nix
+    ./modules/dev/ai.nix
     ./modules/apps/gui.nix
     ./modules/media
     ./modules/gaming
@@ -33,7 +21,8 @@ in
     ./modules/browsers
   ];
 
-  home.stateVersion = "25.11";
+  # Fresh install (Aug 2026, tracking unstable between 26.05 and 26.11).
+  home.stateVersion = "26.05";
   home.sessionPath = [ "$HOME/.local/bin" ];
 
   # SSH is account identity, not an app package, so it stays at the home root.

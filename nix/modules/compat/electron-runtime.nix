@@ -32,20 +32,20 @@
       libgbm
       mesa
       libglvnd
-      xorg.libX11
-      xorg.libXcomposite
-      xorg.libXdamage
-      xorg.libXext
-      xorg.libXfixes
-      xorg.libXrandr
-      xorg.libXcursor
-      xorg.libXi
-      xorg.libXrender
-      xorg.libXScrnSaver
-      xorg.libxshmfence
-      xorg.libXtst
-      xorg.libxcb
-      xorg.libxkbfile
+      libx11
+      libxcomposite
+      libxdamage
+      libxext
+      libxfixes
+      libxrandr
+      libxcursor
+      libxi
+      libxrender
+      libxscrnsaver
+      libxshmfence
+      libxtst
+      libxcb
+      libxkbfile
       libxkbcommon
       wayland
       alsa-lib

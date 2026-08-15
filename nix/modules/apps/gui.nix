@@ -13,7 +13,7 @@ in
   # User-facing desktop applications. These do not need to be system packages,
   # so they live in the Home Manager profile.
   home.packages =
-    lib.optionals pkgs.stdenv.isLinux
+    lib.optionals pkgs.stdenv.hostPlatform.isLinux
     (with pkgs; [
       discord
       libreoffice-fresh
@@ -30,7 +30,7 @@ in
       pkgs.winapps-launcher
     ];
 
-  xdg.desktopEntries.opencode-desktop = lib.mkIf pkgs.stdenv.isLinux {
+  xdg.desktopEntries.opencode-desktop = lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
     name = "OpenCode";
     genericName = "Coding Agent";
     comment = "Desktop app for OpenCode";
@@ -50,7 +50,7 @@ in
 
   # WinApps is userland configuration and should travel with the WinApps HM
   # packages instead of living in the root `home.nix`.
-  xdg.configFile."winapps/winapps.conf".text = lib.mkIf pkgs.stdenv.isLinux ''
+  xdg.configFile."winapps/winapps.conf".text = lib.mkIf pkgs.stdenv.hostPlatform.isLinux ''
     RDP_USER="yiannis"
     RDP_PASS="fuckwindows"
     RDP_DOMAIN=""

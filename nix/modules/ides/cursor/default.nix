@@ -1,6 +1,6 @@
 { pkgs, lib, ... }:
 
-lib.mkIf pkgs.stdenv.isLinux {
+lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
   # 1. Install  custom Cursor package
   home.packages = [
     (import ./cursor.nix { inherit pkgs; })

@@ -3,7 +3,7 @@
 let
   linuxRebuild = "sudo nixos-rebuild switch --flake path:$HOME/nixcfg#nixos";
 
-  linuxUpdateHelpers = lib.optionalString pkgs.stdenv.isLinux ''
+  linuxUpdateHelpers = lib.optionalString pkgs.stdenv.hostPlatform.isLinux ''
     uc() {
         if [[ -z "$1" ]]; then
           echo "Usage: uc <version>"
@@ -73,7 +73,7 @@ in
       ];
       extraConfig = ''
         export ZSH_CUSTOM="$HOME/.config/oh-my-zsh/custom"
-        ${lib.optionalString pkgs.stdenv.isLinux ''export LIBVIRT_DEFAULT_URI="qemu:///system"''}
+        ${lib.optionalString pkgs.stdenv.hostPlatform.isLinux ''export LIBVIRT_DEFAULT_URI="qemu:///system"''}
         VI_MODE_SET_CURSOR=true
       '';
     };

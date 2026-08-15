@@ -49,6 +49,9 @@
     "pci=realloc=on,pcie_bus_perf,hpbussize=32"
   ];
 
+  # Swap lives in compressed RAM like the old CachyOS setup; no swap partition.
+  zramSwap.enable = true;
+
   networking.hostName = "nix-pc";
   networking.networkmanager.enable = true;
   networking.firewall.trustedInterfaces = [ "virbr0" ];
@@ -72,6 +75,7 @@
       "docker"
       "libvirtd"
       "kvm"
+      "nordvpn"
     ];
   };
 
@@ -93,12 +97,10 @@
     };
   };
 
-  services.nordvpn = {
-    # Keep the daemon available so the CLI can connect on demand. Autoconnect is
-    # managed by NordVPN's own settings, not by disabling the NixOS service.
-    enable = true;
-    users = [ "yiannis" ];
-  };
+  # Uses the nixpkgs services.nordvpn module (upstreamed since 25.11; the old
+  # nordvpn-flake module is gone). CLI access is via the nordvpn group on the
+  # user. Keep the daemon available so the CLI can connect on demand.
+  services.nordvpn.enable = true;
 
   # Hardware toggles stay host-level because they describe devices attached to
   # this desktop, while their helper packages live in the relevant modules.
@@ -131,5 +133,6 @@
     done
   '';
 
-  system.stateVersion = "25.11";
+  # Fresh install (Aug 2026, tracking unstable between 26.05 and 26.11).
+  system.stateVersion = "26.05";
 }

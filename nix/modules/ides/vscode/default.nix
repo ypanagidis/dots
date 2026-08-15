@@ -1,7 +1,6 @@
 {
   config,
   pkgs,
-  pkgsMaster,
   lib,
   ...
 }:
@@ -14,7 +13,7 @@ let
   repoRoot = "${config.home.homeDirectory}/nixcfg";
   repoSettings = "${repoRoot}/modules/ides/vscode/settings.json";
   repoKeybindings = "${repoRoot}/modules/ides/vscode/keybindings.json";
-  vscodePkg = pkgsMaster.vscode;
+  vscodePkg = pkgs.vscode;
 
   vscodeLauncher = pkgs.writeShellScript "vscode-launcher" ''
     if [ "$#" -gt 0 ]; then
@@ -83,7 +82,7 @@ in
     config.lib.file.mkOutOfStoreSymlink repoKeybindings;
   xdg.configFile."Code/User/keybindings.json".force = true;
 
-  xdg.desktopEntries.code = lib.mkIf pkgs.stdenv.isLinux {
+  xdg.desktopEntries.code = lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
     name = "Visual Studio Code";
     genericName = "Text Editor";
     comment = "Code Editing. Redefined.";
@@ -104,7 +103,7 @@ in
     };
   };
 
-  xdg.desktopEntries.code-url-handler = lib.mkIf pkgs.stdenv.isLinux {
+  xdg.desktopEntries.code-url-handler = lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
     name = "Visual Studio Code - URL Handler";
     noDisplay = true;
     exec = "${vscodeLauncher} %U";

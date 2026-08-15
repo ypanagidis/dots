@@ -1,7 +1,14 @@
 # dotfiles
 
-My personal macOS dotfiles: a zsh setup (starship prompt, XDG-clean layout,
-git-managed plugins), Neovim, tmux, and Ghostty.
+My personal configs, unified into two top-level trees:
+
+- **`dots/`** — raw dotfiles (zsh, Neovim, tmux, Ghostty, niri, herdr, …),
+  symlinked into `$HOME` by `install.sh` on Arch/CachyOS.
+- **`nix/`** — the NixOS flake (imported from the old `nixcfg` repo with
+  history). Its home-manager `modules/dots.nix` symlinks shared configs out of
+  `dots/`, and `nix/INSTALL.md` is the fresh-install runbook (disko-based).
+
+Everything below describes the contents of `dots/`.
 
 ## What's in here
 

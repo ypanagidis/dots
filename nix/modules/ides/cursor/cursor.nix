@@ -17,7 +17,7 @@ pkgs.appimageTools.wrapType2 {
       nodejs
 
       # Required for keymapping (fixes the error you saw)
-      xorg.libxkbfile
+      libxkbfile
 
       # Common libraries that Electron apps and extensions need
       libsecret
@@ -34,12 +34,12 @@ pkgs.appimageTools.wrapType2 {
       gtk3
       pango
       cairo
-      xorg.libX11
-      xorg.libXcomposite
-      xorg.libXdamage
-      xorg.libXext
-      xorg.libXfixes
-      xorg.libXrandr
+      libx11
+      libxcomposite
+      libxdamage
+      libxext
+      libxfixes
+      libxrandr
       mesa
       alsa-lib
     ];
