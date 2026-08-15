@@ -23,19 +23,5 @@ in
       haruna
       bruno
       obsidian
-    ])
-    ++ lib.optionals (pkgs ? winapps) [
-      pkgs.winapps
-      pkgs.winapps-launcher
-    ];
-
-  # WinApps is userland configuration and should travel with the WinApps HM
-  # packages instead of living in the root `home.nix`.
-  xdg.configFile."winapps/winapps.conf".text = lib.mkIf pkgs.stdenv.hostPlatform.isLinux ''
-    RDP_USER="yiannis"
-    RDP_PASS="fuckwindows"
-    RDP_DOMAIN=""
-    RDP_IP="192.168.122.85"
-    WAFLAVOR="libvirt"
-  '';
+    ]);
 }
