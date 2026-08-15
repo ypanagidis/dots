@@ -207,6 +207,11 @@ in
       plasmashell."manage activities" = "Meta+Q";
       plasmashell."next activity" = "Meta+A";
       plasmashell."previous activity" = "Meta+Shift+A";
+      ActivityManager."switch-to-activity-7cd1ec6d-2640-4af9-8e0f-36858842803d" = "Meta+Ctrl+1";
+      ActivityManager."switch-to-activity-a205ecff-1dcf-4f19-84e9-b12ac444c66d" = "Meta+Ctrl+2";
+      ActivityManager."switch-to-activity-3cc4025f-62c5-4d35-bad7-2eeac5962746" = "Meta+Ctrl+3";
+      ActivityManager."switch-to-activity-c608c6c9-b6c3-4e10-ab72-2509f64c8a81" = "Meta+Ctrl+4";
+      ActivityManager."switch-to-activity-88c96075-3fd2-47a6-90e6-70f9b4556a51" = "Meta+Ctrl+5";
       plasmashell."show dashboard" = "Ctrl+F12";
       plasmashell.show-on-mouse-pos = "Meta+V";
       "services/org.kde.spectacle.desktop"._launch = [
@@ -250,7 +255,16 @@ in
       dolphinrc.General.ViewPropsTimestamp = "2025,12,25,3,11,27.774";
       dolphinrc."KFileDialog Settings"."Places Icons Auto-resize" = false;
       dolphinrc."KFileDialog Settings"."Places Icons Static Size" = 22;
-      kactivitymanagerdrc.activities."88c96075-3fd2-47a6-90e6-70f9b4556a51" = "Default";
+      # Activities = the context groups from the niri setup (contexts.conf).
+      # Each is an independent window set on top of the (per-screen) desktop
+      # grid. Meta+A / Meta+Shift+A cycle, Meta+Q manages, Meta+Ctrl+1..5
+      # jump directly. The pre-existing UUID stays as Admin so windows that
+      # predate this config land there.
+      kactivitymanagerdrc.activities."88c96075-3fd2-47a6-90e6-70f9b4556a51" = "Admin";
+      kactivitymanagerdrc.activities."7cd1ec6d-2640-4af9-8e0f-36858842803d" = "UP";
+      kactivitymanagerdrc.activities."a205ecff-1dcf-4f19-84e9-b12ac444c66d" = "Webroot";
+      kactivitymanagerdrc.activities."3cc4025f-62c5-4d35-bad7-2eeac5962746" = "Sealant";
+      kactivitymanagerdrc.activities."c608c6c9-b6c3-4e10-ab72-2509f64c8a81" = "Side";
       kactivitymanagerdrc.main.currentActivity = "88c96075-3fd2-47a6-90e6-70f9b4556a51";
       katerc.General."Days Meta Infos" = 30;
       katerc.General."Save Meta Infos" = true;
@@ -341,8 +355,12 @@ in
       kwalletrc.Wallet."Use One Wallet" = true;
       kwalletrc."org.freedesktop.secrets".apiEnabled = true;
       kwinrc.Desktops.Id_1 = "6c7ed35d-a893-4861-a4d8-e10caa85be7d";
-      kwinrc.Desktops.Number = 1;
+      kwinrc.Desktops.Number = 4;
       kwinrc.Desktops.Rows = 1;
+      # Plasma 6.7: each screen switches desktops independently — with
+      # fullscreen-ish windows and Meta+Ctrl+Left/Right this approximates
+      # niri's per-output scrolling strip.
+      kwinrc.Windows.PerOutputVirtualDesktops = true;
       kwinrc.Tiling."[Tiling][6c7ed35d-a893-4861-a4d8-e10caa85be7d][]" = "";
       kwinrc.Tiling.padding = 4;
       kwinrc.Tiling.tiles = "{\"layoutDirection\":\"horizontal\",\"tiles\":[{\"width\":0.25},{\"width\":0.5},{\"width\":0.25}]}";
