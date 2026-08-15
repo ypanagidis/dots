@@ -6,6 +6,7 @@
   imports = [
     ./hardware-configuration.nix
     ./system/mt7927-bluetooth.nix
+    ./system/lianli-fans.nix
 
     # System building blocks.
     ./modules/system/base-packages.nix
