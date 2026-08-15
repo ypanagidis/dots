@@ -214,7 +214,6 @@ in
         "Meta+Shift+S"
         "Ctrl+#"
       ];
-      "services/opencode-desktop.desktop"._launch = "Meta+G";
     };
     window-rules = [
       {
@@ -359,7 +358,7 @@ in
       plasmarc.Wallpapers.usersWallpapers = "";
       "plasma-org.kde.plasma.desktop-appletsrc"."Containments/3/Applets/30/Configuration/General".launchers =
         {
-          value = "applications:helium.desktop,applications:com.mitchellh.ghostty.desktop,applications:discord.desktop,applications:spotify.desktop,applications:obsidian.desktop,applications:datagrip.desktop,applications:bruno.desktop,applications:opencode-desktop.desktop,applications:systemsettings.desktop,preferred://filemanager";
+          value = "applications:helium.desktop,applications:com.mitchellh.ghostty.desktop,applications:discord.desktop,applications:spotify.desktop,applications:obsidian.desktop,applications:datagrip.desktop,applications:bruno.desktop,applications:systemsettings.desktop,preferred://filemanager";
           escapeValue = false;
         };
       spectaclerc.Annotations.annotationToolType = 9;

@@ -92,15 +92,17 @@ in
         pushd ${flakeDir} > /dev/null && ${rebuild} && popd > /dev/null
       }
 
-      ocu() {
+      # Update the AI agent CLIs (claude-code/codex/opencode/gemini-cli all
+      # ride the llm-agents input) and rebuild.
+      uai() {
         local original_dir="$PWD"
         cd ${flakeDir} || return 1
 
-        if ./update-annoying.sh opencode; then
+        if nix flake update llm-agents; then
           echo "Rebuilding..."
           re
         else
-          echo "Opencode update failed"
+          echo "llm-agents update failed"
         fi
 
         cd "$original_dir"

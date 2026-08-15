@@ -1,4 +1,9 @@
-{ pkgs, dotsLink, ... }:
+{
+  pkgs,
+  lib,
+  dotsLink,
+  ...
+}:
 
 {
   # Neovim: the config is the shared dots/.config/nvim (lazy.nvim +
@@ -18,7 +23,10 @@
     # LSP servers
     typescript
     typescript-language-server
-    tsgo # TypeScript 7 native compiler
+    # TypeScript 7 from nixpkgs; provides both tsgo and tsc. lowPrio so the
+    # classic typescript package keeps owning `tsc` (ts_ls compatibility)
+    # while `tsgo` comes from here — same split the old binary pin had.
+    (lib.lowPrio typescript-go)
     oxlint
     tailwindcss-language-server
     gopls
