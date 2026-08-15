@@ -1,0 +1,84 @@
+# "dots" btop theme — generated from the ghostty palette in
+# dots/.config/ghostty/config so the terminal tools share one look.
+#   bg #1b1b1d  fg #d7d7d7  red #ff5c57  green #5af078  yellow #ffd866
+#   blue/cyan #45c8ff  magenta #ff40ff  bright-black #5f6368  sel #3f3f44
+
+# Main background and foreground
+theme[main_bg]="#1b1b1d"
+theme[main_fg]="#d7d7d7"
+
+# Title color for boxes
+theme[title]="#ffffff"
+
+# Highlight color for keyboard shortcuts
+theme[hi_fg]="#45c8ff"
+
+# Background and foreground of selected item in processes box
+theme[selected_bg]="#3f3f44"
+theme[selected_fg]="#5ad4ff"
+
+# Color of inactive/disabled text
+theme[inactive_fg]="#5f6368"
+
+# Color of text appearing on top of graphs
+theme[graph_text]="#d7d7d7"
+
+# Background color of the percentage meters
+theme[meter_bg]="#3f3f44"
+
+# Misc colors for processes box (tree branches etc.)
+theme[proc_misc]="#5af078"
+
+# Box outline colors
+theme[cpu_box]="#3f3f44"
+theme[mem_box]="#3f3f44"
+theme[net_box]="#3f3f44"
+theme[proc_box]="#3f3f44"
+
+# Divider line color
+theme[div_line]="#3f3f44"
+
+# Temperature graph gradient (cool -> hot)
+theme[temp_start]="#5af078"
+theme[temp_mid]="#ffd866"
+theme[temp_end]="#ff5c57"
+
+# CPU graph gradient (idle -> busy)
+theme[cpu_start]="#5af078"
+theme[cpu_mid]="#ffd866"
+theme[cpu_end]="#ff5c57"
+
+# Mem/Disk free meter
+theme[free_start]="#5af078"
+theme[free_mid]="#69ff8a"
+theme[free_end]="#d7d7d7"
+
+# Mem/Disk cached meter
+theme[cached_start]="#45c8ff"
+theme[cached_mid]="#5ad4ff"
+theme[cached_end]="#ffffff"
+
+# Mem/Disk available meter
+theme[available_start]="#ffd866"
+theme[available_mid]="#ffe680"
+theme[available_end]="#ffffff"
+
+# Mem/Disk used meter
+theme[used_start]="#ff5c57"
+theme[used_mid]="#ff6b66"
+theme[used_end]="#ffffff"
+
+# Download graph gradient
+theme[download_start]="#45c8ff"
+theme[download_mid]="#5ad4ff"
+theme[download_end]="#ff40ff"
+
+# Upload graph gradient
+theme[upload_start]="#ff40ff"
+theme[upload_mid]="#ff66ff"
+theme[upload_end]="#ffffff"
+
+# Process box gradient (color by cpu usage)
+theme[process_start]="#45c8ff"
+theme[process_mid]="#bd5eff"
+theme[process_end]="#ff5c57"
