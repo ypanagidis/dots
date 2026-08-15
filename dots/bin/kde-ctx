@@ -1,16 +1,28 @@
 #!/usr/bin/env bash
 # kde-ctx — context helper for the KDE Activities port of the niri contexts.
 # Activities carry the context identity (UP/Webroot/Sealant/Side/Admin);
-# repo lists and default dirs still come from the shared contexts.conf.
+# repo lists and helium profiles still come from the shared contexts.conf.
+# term/browser are focus-or-launch: they activate the context's existing
+# window when there is one, and only otherwise spawn it (--new forces spawn).
 set -euo pipefail
 
 AMS=org.kde.ActivityManager
 AMP=/ActivityManager/Activities
 AMI=org.kde.ActivityManager.Activities
+
 # Shared with niri-ctx: CTX_REPOS + CTX_HELIUM_PROFILE live here. Prefer the
 # linked config, fall back to the dots tree (KDE installs don't link niri/).
 CONF="$HOME/.config/niri/contexts.conf"
 [[ -f "$CONF" ]] || CONF="$HOME/Developer/Configs/dots/.config/niri/contexts.conf"
+
+# Source at top level: the conf uses plain `declare -A`, which would be
+# function-local if sourced inside a helper. Pre-declare so a missing conf
+# leaves empty arrays (unset arrays arithmetic-eval string subscripts).
+declare -A CTX_REPOS=() CTX_HELIUM_PROFILE=()
+# shellcheck disable=SC1090
+[[ -f "$CONF" ]] && source "$CONF" >/dev/null 2>&1 || true
+
+CACHE_DIR="${XDG_RUNTIME_DIR:-/tmp}/kde-ctx"
 
 current_id() { qdbus "$AMS" "$AMP" "$AMI.CurrentActivity"; }
 act_name() { qdbus "$AMS" "$AMP" "$AMI.ActivityName" "$1"; }
@@ -23,7 +35,7 @@ list_activities() {
 }
 
 id_for_name() {
-    local want="$1" line id name
+    local want="$1" id name
     while IFS=$'\t' read -r id name; do
         if [[ "${name,,}" == "${want,,}" ]]; then
             printf '%s\n' "$id"
@@ -32,13 +44,6 @@ id_for_name() {
     done < <(list_activities)
     return 1
 }
-
-# Source at top level: the conf uses plain `declare -A`, which would be
-# function-local if sourced inside a helper. Pre-declare so a missing conf
-# leaves empty arrays (unset arrays arithmetic-eval string subscripts).
-declare -A CTX_REPOS=() CTX_HELIUM_PROFILE=()
-# shellcheck disable=SC1090
-[[ -f "$CONF" ]] && source "$CONF" >/dev/null 2>&1 || true
 
 # First entry of CTX_REPOS[<ctx>] ("label=dir ...") supplies the default dir.
 ctx_dir() {
@@ -53,7 +58,34 @@ ctx_dir() {
 
 ctx_profile() { printf '%s\n' "${CTX_HELIUM_PROFILE[$1]:-Default}"; }
 
+# The context terminal is class-addressed (like niri-ctx app-ids), so finding
+# it is an exact window search — no activity bookkeeping needed.
+term_class() { printf 'dev.yiannis.kdectx.%s.term\n' "${1,,}"; }
+
+have_kdotool() { command -v kdotool >/dev/null 2>&1; }
+
+# Activate the first window matching a class regex; fail silently otherwise.
+focus_class() {
+    local id
+    have_kdotool || return 1
+    id="$(kdotool search --limit 1 --class "$1" 2>/dev/null | head -1)"
+    [[ -n "$id" ]] || return 1
+    exec kdotool windowactivate "$id"
+}
+
+window_alive() {
+    have_kdotool && kdotool getwindowname "$1" >/dev/null 2>&1
+}
+
+# Parse: <cmd> [--new] [ctx]
 cmd="${1:-current}"
+shift || true
+force_new=0
+if [[ "${1:-}" == "--new" ]]; then
+    force_new=1
+    shift
+fi
+
 case "$cmd" in
 current)
     act_name "$(current_id)"
@@ -65,42 +97,75 @@ list)
     list_activities
     ;;
 switch)
-    [[ $# -ge 2 ]] || { echo "usage: kde-ctx switch <name>" >&2; exit 2; }
-    id="$(id_for_name "$2")" || { echo "no activity named '$2'" >&2; exit 1; }
+    [[ $# -ge 1 ]] || { echo "usage: kde-ctx switch <name>" >&2; exit 2; }
+    id="$(id_for_name "$1")" || { echo "no activity named '$1'" >&2; exit 1; }
     qdbus "$AMS" "$AMP" "$AMI.SetCurrentActivity" "$id" >/dev/null
     ;;
+info)
+    ctx="${1:-$(act_name "$(current_id)")}"
+    printf 'ctx:\t%s\nsession:\t%s-work\ndir:\t%s\nprofile:\t%s\nclass:\t%s\n' \
+        "$ctx" "$ctx" "$(ctx_dir "$ctx")" "$(ctx_profile "$ctx")" "$(term_class "$ctx")"
+    ;;
 term)
-    # Terminal attached to the context's herdr work session, in its default
-    # repo dir. herdr refuses to nest, so strip any inherited HERDR_* first.
-    ctx="${2:-$(act_name "$(current_id)")}"
+    # Focus the context terminal if it exists, else attach a fresh ghostty to
+    # the context's herdr work session in its default repo dir. herdr refuses
+    # to nest, so strip any inherited HERDR_* before launching.
+    ctx="${1:-$(act_name "$(current_id)")}"
+    # Refuse ctx names that aren't activities — a typo'd ctx would silently
+    # create a junk herdr session (learned the hard way with "--help").
+    id_for_name "$ctx" >/dev/null || { echo "no activity named '$ctx'" >&2; exit 1; }
+    class="$(term_class "$ctx")"
+    ((force_new)) || focus_class "^${class//./\\.}$" || true
     dir="$(ctx_dir "$ctx")"
     for v in $(compgen -v HERDR_ || true); do unset "$v"; done
-    exec ghostty --working-directory="$dir" \
+    exec ghostty --class="$class" --working-directory="$dir" \
         -e env HERDR_STARTUP_CWD="$dir" herdr --session "${ctx}-work"
     ;;
-info)
-    ctx="${2:-$(act_name "$(current_id)")}"
-    printf 'ctx:\t%s\nsession:\t%s-work\ndir:\t%s\nprofile:\t%s\n' \
-        "$ctx" "$ctx" "$(ctx_dir "$ctx")" "$(ctx_profile "$ctx")"
-    ;;
 browser)
-    # Helium with the context's profile (CTX_HELIUM_PROFILE in contexts.conf).
+    # Helium profiles share one process, so windows can't be told apart by
+    # class or title — remember the window id we launched per context instead.
+    ctx="${1:-$(act_name "$(current_id)")}"
+    id_for_name "$ctx" >/dev/null || { echo "no activity named '$ctx'" >&2; exit 1; }
+    cache="$CACHE_DIR/browser-$ctx"
+    if ((!force_new)) && [[ -f "$cache" ]]; then
+        wid="$(<"$cache")"
+        if window_alive "$wid"; then
+            exec kdotool windowactivate "$wid"
+        fi
+        rm -f "$cache"
+    fi
+    mkdir -p "$CACHE_DIR"
+    before="$(have_kdotool && kdotool search --class '^helium$' 2>/dev/null || true)"
     # Step to the active screen's next desktop first so the browser lands
     # there — the niri "browser in the next column" flow. On the last desktop
     # this is a no-op and the browser opens on the current one.
-    ctx="${2:-$(act_name "$(current_id)")}"
     qdbus org.kde.KWin /KWin org.kde.KWin.nextDesktop >/dev/null 2>&1 || true
-    exec helium --profile-directory="$(ctx_profile "$ctx")"
+    helium --profile-directory="$(ctx_profile "$ctx")" >/dev/null 2>&1 &
+    disown
+    if have_kdotool; then
+        for _ in $(seq 1 25); do
+            sleep 0.2
+            for wid in $(kdotool search --class '^helium$' 2>/dev/null); do
+                if ! grep -qF "$wid" <<<"$before"; then
+                    printf '%s\n' "$wid" >"$cache"
+                    exit 0
+                fi
+            done
+        done
+    fi
     ;;
 *)
     cat >&2 <<'EOF'
-usage: kde-ctx <command>
+usage: kde-ctx <command> [--new] [ctx]
   current          print the current activity's name (default)
   id               print the current activity's uuid
   list             uuid<TAB>name for every activity
   switch <name>    switch to the named activity (case-insensitive)
-  term [ctx]       ghostty on the context's herdr work session + repo dir
-  browser [ctx]    helium with the context's profile
+  term [ctx]       focus the context terminal, or open it (herdr work
+                   session in the context's default repo dir)
+  browser [ctx]    focus the context browser, or open it on the next
+                   desktop (helium with the context's profile)
+  --new            skip the focus step and always open a fresh window
                    (ctx defaults to the current activity)
 EOF
     exit 2

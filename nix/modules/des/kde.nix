@@ -175,17 +175,10 @@ in
         "Alt+F1"
         "Alt+Space"
       ];
-      # Hyper+A/C = taskbar entries 1/2 (helium/ghostty): focus the existing
-      # window in this activity, or launch. Context-aware FIRST opens are the
-      # kde-ctx binds (Hyper+Return/B) below.
-      plasmashell."activate task manager entry 1" = [
-        "Meta+1"
-        "Meta+Ctrl+Alt+Shift+A"
-      ];
-      plasmashell."activate task manager entry 2" = [
-        "Meta+2"
-        "Meta+Ctrl+Alt+Shift+C"
-      ];
+      # Hyper+A/C belong to the kde-ctx focus-or-launch binds below; the
+      # taskbar pins keep their Meta+N activation only.
+      plasmashell."activate task manager entry 1" = "Meta+1";
+      plasmashell."activate task manager entry 2" = "Meta+2";
       plasmashell."activate task manager entry 3" = [
         "Meta+3"
         "Meta+Ctrl+Alt+Shift+D"
@@ -239,18 +232,29 @@ in
     # Meta+Shift+S: draw a region, image lands on the clipboard, no window —
     # same flow as the old grim/slurp binding on niri. (-r region, -b no GUI,
     # -c clipboard)
-    # Context FIRST-open launchers: always spawn a fresh window wired to the
-    # current activity (herdr session / helium profile). Day-to-day focusing
-    # goes through the Hyper+A/C taskbar binds above.
+    # Context launchers, focus-or-launch (niri muscle memory): Hyper+C/A
+    # activate the context's existing terminal/browser window, or open it
+    # (terminal: herdr work session; browser: context profile on the next
+    # desktop). Hyper+Return/B force a fresh window.
     hotkeys.commands.kde-ctx-term = {
-      name = "Context terminal (herdr work session)";
-      key = "Meta+Ctrl+Alt+Shift+Return";
+      name = "Context terminal (focus or launch)";
+      key = "Meta+Ctrl+Alt+Shift+C";
       command = "/home/yiannis/.local/bin/kde-ctx term";
     };
     hotkeys.commands.kde-ctx-browser = {
-      name = "Context browser (helium profile)";
-      key = "Meta+Ctrl+Alt+Shift+B";
+      name = "Context browser (focus or launch)";
+      key = "Meta+Ctrl+Alt+Shift+A";
       command = "/home/yiannis/.local/bin/kde-ctx browser";
+    };
+    hotkeys.commands.kde-ctx-term-new = {
+      name = "Context terminal (new window)";
+      key = "Meta+Ctrl+Alt+Shift+Return";
+      command = "/home/yiannis/.local/bin/kde-ctx term --new";
+    };
+    hotkeys.commands.kde-ctx-browser-new = {
+      name = "Context browser (new window)";
+      key = "Meta+Ctrl+Alt+Shift+B";
+      command = "/home/yiannis/.local/bin/kde-ctx browser --new";
     };
     hotkeys.commands.spectacle-region-clipboard = {
       name = "Region screenshot to clipboard";

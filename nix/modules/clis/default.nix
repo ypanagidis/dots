@@ -51,5 +51,7 @@
     # Clipboard CLI — also what Claude Code and other TUIs use to read/write
     # image clipboard content under Wayland.
     wl-clipboard
+    # xdotool-for-KWin; kde-ctx uses it to find/activate context windows.
+    kdotool
   ];
 }
