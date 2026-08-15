@@ -13,6 +13,14 @@
   # dots/ copy became the single source of truth.
   xdg.configFile."nvim".source = dotsLink ".config/nvim";
 
+  # Home Manager owns ~/.zshenv on NixOS, so the exports in the shared
+  # dots/.config/zsh/.zshenv are not sourced here. Declare the editor in the
+  # session environment so long-running tools such as Herdr inherit it too.
+  home.sessionVariables = {
+    EDITOR = "nvim";
+    VISUAL = "nvim";
+  };
+
   home.packages = with pkgs; [
     neovim
 

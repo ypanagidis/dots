@@ -52,6 +52,18 @@ auto_switch = false
 # manifest_check = true
 
 [keys]
+# Daily navigation (press ctrl+s, release it, then press the remaining key):
+#   w, then j / k    persistent workspace picker
+#   ctrl+j / ctrl+k  next / previous workspace
+#   j / k            next / previous agent, wherever it is
+#   n / p / c / t    next / previous / new / rename tab
+#   1..9             jump to a tab
+#   h / l            focus a split pane left / right
+#   tab / shift+tab  cycle split panes
+#   v / -            split right / split down
+#   u / [            edit scrollback in $EDITOR / enter copy mode
+#   ?                show every active binding (press / to search)
+
 # Prefix key to enter prefix mode (default: "ctrl+b")
 # Examples: "ctrl+b", "f12", "esc", "-"
 # Action bindings use explicit syntax: "prefix+n" requires the prefix;
@@ -60,16 +72,16 @@ auto_switch = false
 # Named punctuation such as minus, comma, ampersand, plus, and backtick is also accepted.
 # Most reliable direct bindings are ctrl+letter, function keys, and explicit modified chords.
 # alt+..., cmd/super, and punctuation-with-modifiers may depend on your terminal/tmux setup.
-prefix = "ctrl+s"        # user's tmux prefix — THE core hotkey
+prefix = "ctrl+s"
 
 # Prefix-mode actions
-# help = "prefix+?"
+help = "prefix+?"
 # settings = "prefix+s"
 detach = "prefix+d"           # tmux muscle memory (herdr default was prefix+q)
 # reload_config = "prefix+shift+r"
 # open_notification_target = "prefix+o"
-# workspace_picker = "prefix+w"
-# goto = "prefix+g"
+workspace_picker = "prefix+w"
+goto = "prefix+g"
 # new_workspace = "prefix+shift+n"
 # new_worktree = "prefix+shift+g"
 # open_worktree = ""    # optional, unset by default
@@ -78,54 +90,77 @@ detach = "prefix+d"           # tmux muscle memory (herdr default was prefix+q)
 # close_workspace = "prefix+shift+d"
 previous_workspace = "prefix+ctrl+k"  # k=up=prev; ctrl-chord keeps plain j/k for pane focus
 next_workspace = "prefix+ctrl+j"      # j=down=next; only fires after the ctrl+s prefix, so nvim C-j is safe
-previous_agent = "ctrl+shift+k"
-next_agent = "ctrl+shift+j"
+previous_agent = "prefix+k"
+next_agent = "prefix+j"
 # focus_agent = ""        # optional indexed binding, e.g. "prefix+alt+1..9"
 # remote_image_paste = "ctrl+v" # only active in herdr --remote; empty disables raw-key image paste
-# new_tab = "prefix+c"
-# rename_tab = "prefix+shift+t"
-# previous_tab = "prefix+p"
-# next_tab = "prefix+n"
+new_tab = "prefix+c"
+rename_tab = "prefix+t"
+previous_tab = "prefix+p"
+next_tab = "prefix+n"
 switch_tab = "prefix+1..9"    # role tabs: 1=editor 2=agents 3=logs in every repo workspace
 # switch_workspace = ""   # optional indexed binding, e.g. "prefix+shift+1..9"
 # close_tab = "prefix+shift+x"
 # rename_pane = "prefix+shift+p"
-edit_scrollback = "prefix+u"       # tmux: bind u copy-mode
-# focus_pane_left = "prefix+h"
-# focus_pane_down = "prefix+j"
-# focus_pane_up = "prefix+k"
-# focus_pane_right = "prefix+l"
-# focus_pane_left/down/up/right stay prefix+h/j/k/l (herdr defaults, vim-like).
-# Deliberately NOT binding direct ctrl+h/j/k/l: herdr would swallow them and
-# break C-hjkl inside nvim (vim-tmux-navigator has no herdr equivalent).
-# cycle_pane_next = "prefix+tab"
-# cycle_pane_previous = "prefix+shift+tab"
+edit_scrollback = "prefix+u"       # open the focused pane's scrollback in $EDITOR
+copy_mode = "prefix+["
+focus_pane_left = "prefix+h"
+focus_pane_down = ""
+focus_pane_up = ""
+focus_pane_right = "prefix+l"
+# Direct ctrl+h/j/k/l below handles pane navigation, including Neovim splits.
+cycle_pane_next = "prefix+tab"
+cycle_pane_previous = "prefix+shift+tab"
 # last_pane = ""          # optional, unset by default; bind e.g. "prefix+tab" for global back-and-forth
 split_vertical = "prefix+v"        # herdr default; tmux's `prefix =` is not expressible —
 # verified live 2026-07-04: herdr 0.7.1 rejects "prefix+equal" ("invalid keybinding;
 # disabling binding"), so the split keys are prefix+v (side-by-side) / prefix+- (stacked).
 split_horizontal = "prefix+minus"  # tmux: bind - split-window -v
-# close_pane = "prefix+x"
+close_pane = "prefix+x"
 zoom = "prefix+m"             # tmux: bind -r m resize-pane -Z
-# resize_mode = "prefix+r"
-# toggle_sidebar = "prefix+b"
+resize_mode = "prefix+r"
+toggle_sidebar = "prefix+b"
 
 # Navigate-mode movement. These local shortcuts win while navigate mode is open.
 # They are independent from focus_pane_*. Do not include prefix+, esc, enter, tab, or 1..9 here.
-# navigate_workspace_up = "up"
-# navigate_workspace_down = "down"
-# navigate_pane_left = "h"      # left arrow always focuses the pane to the left
-# navigate_pane_down = "j"
-# navigate_pane_up = "k"
-# navigate_pane_right = "l"     # right arrow always focuses the pane to the right
+navigate_workspace_up = "k"
+navigate_workspace_down = "j"
+navigate_pane_left = "ctrl+h"   # left arrow is also a permanent alias
+navigate_pane_down = "ctrl+j"
+navigate_pane_up = "ctrl+k"
+navigate_pane_right = "ctrl+l"  # right arrow is also a permanent alias
+
+# Seamless navigation across Herdr panes and Neovim splits. The plugin forwards
+# Ctrl+h/j/k/l to Neovim while it is focused; Neovim hands navigation back to
+# Herdr when it reaches a split edge. In non-Vim panes these focus Herdr panes
+# directly. prefix+h/j/k/l remain available as a fallback.
+[[keys.command]]
+key = "ctrl+h"
+type = "plugin_action"
+command = "vim-herdr-navigation.left"
+description = "navigate left (vim/herdr)"
+
+[[keys.command]]
+key = "ctrl+j"
+type = "plugin_action"
+command = "vim-herdr-navigation.down"
+description = "navigate down (vim/herdr)"
+
+[[keys.command]]
+key = "ctrl+k"
+type = "plugin_action"
+command = "vim-herdr-navigation.up"
+description = "navigate up (vim/herdr)"
+
+[[keys.command]]
+key = "ctrl+l"
+type = "plugin_action"
+command = "vim-herdr-navigation.right"
+description = "navigate right (vim/herdr)"
 
 # Custom commands use the same binding syntax.
 # type = "shell" runs detached in the background.
 # type = "pane" opens a temporary pane and closes it when the command exits.
-# [[keys.command]]
-# key = "prefix+alt+g"
-# type = "pane"
-# command = "lazygit"
 
 # Legacy indexed shortcut config is still parsed for compatibility.
 # Prefer switch_tab, switch_workspace, and focus_agent for new configs.
