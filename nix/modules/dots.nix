@@ -17,6 +17,9 @@ in
   # to dots/ from their own modules (via dotsLink); zsh/btop remain nix-native
   # for now — the dots zsh plugins are embedded git checkouts that a fresh
   # clone would not include.
+  # Context helper for the KDE Activities port of the niri contexts.
+  home.file.".local/bin/kde-ctx".source = link "bin/kde-ctx";
+
   xdg.configFile = {
     "alacritty".source = link ".config/alacritty";
     "herdr".source = link ".config/herdr";

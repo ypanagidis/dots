@@ -1,0 +1,104 @@
+#!/usr/bin/env bash
+# kde-ctx — context helper for the KDE Activities port of the niri contexts.
+# Activities carry the context identity (UP/Webroot/Sealant/Side/Admin);
+# repo lists and default dirs still come from the shared contexts.conf.
+set -euo pipefail
+
+AMS=org.kde.ActivityManager
+AMP=/ActivityManager/Activities
+AMI=org.kde.ActivityManager.Activities
+# Shared with niri-ctx: CTX_REPOS + CTX_HELIUM_PROFILE live here. Prefer the
+# linked config, fall back to the dots tree (KDE installs don't link niri/).
+CONF="$HOME/.config/niri/contexts.conf"
+[[ -f "$CONF" ]] || CONF="$HOME/Developer/Configs/dots/.config/niri/contexts.conf"
+
+current_id() { qdbus "$AMS" "$AMP" "$AMI.CurrentActivity"; }
+act_name() { qdbus "$AMS" "$AMP" "$AMI.ActivityName" "$1"; }
+
+list_activities() {
+    local a
+    for a in $(qdbus "$AMS" "$AMP" "$AMI.ListActivities"); do
+        printf '%s\t%s\n' "$a" "$(act_name "$a")"
+    done
+}
+
+id_for_name() {
+    local want="$1" line id name
+    while IFS=$'\t' read -r id name; do
+        if [[ "${name,,}" == "${want,,}" ]]; then
+            printf '%s\n' "$id"
+            return 0
+        fi
+    done < <(list_activities)
+    return 1
+}
+
+# Source at top level: the conf uses plain `declare -A`, which would be
+# function-local if sourced inside a helper. Pre-declare so a missing conf
+# leaves empty arrays (unset arrays arithmetic-eval string subscripts).
+declare -A CTX_REPOS=() CTX_HELIUM_PROFILE=()
+# shellcheck disable=SC1090
+[[ -f "$CONF" ]] && source "$CONF" >/dev/null 2>&1 || true
+
+# First entry of CTX_REPOS[<ctx>] ("label=dir ...") supplies the default dir.
+ctx_dir() {
+    local entry="${CTX_REPOS[$1]:-}"
+    if [[ -n "$entry" ]]; then
+        entry="${entry%% *}"        # first "label=dir"
+        printf '%s\n' "${entry#*=}"
+    else
+        printf '%s\n' "$HOME"
+    fi
+}
+
+ctx_profile() { printf '%s\n' "${CTX_HELIUM_PROFILE[$1]:-Default}"; }
+
+cmd="${1:-current}"
+case "$cmd" in
+current)
+    act_name "$(current_id)"
+    ;;
+id)
+    current_id
+    ;;
+list)
+    list_activities
+    ;;
+switch)
+    [[ $# -ge 2 ]] || { echo "usage: kde-ctx switch <name>" >&2; exit 2; }
+    id="$(id_for_name "$2")" || { echo "no activity named '$2'" >&2; exit 1; }
+    qdbus "$AMS" "$AMP" "$AMI.SetCurrentActivity" "$id" >/dev/null
+    ;;
+term)
+    # Terminal attached to the context's herdr work session, in its default
+    # repo dir. herdr refuses to nest, so strip any inherited HERDR_* first.
+    ctx="${2:-$(act_name "$(current_id)")}"
+    dir="$(ctx_dir "$ctx")"
+    for v in $(compgen -v HERDR_ || true); do unset "$v"; done
+    exec ghostty --working-directory="$dir" \
+        -e env HERDR_STARTUP_CWD="$dir" herdr --session "${ctx}-work"
+    ;;
+info)
+    ctx="${2:-$(act_name "$(current_id)")}"
+    printf 'ctx:\t%s\nsession:\t%s-work\ndir:\t%s\nprofile:\t%s\n' \
+        "$ctx" "$ctx" "$(ctx_dir "$ctx")" "$(ctx_profile "$ctx")"
+    ;;
+browser)
+    # Helium with the context's profile (CTX_HELIUM_PROFILE in contexts.conf).
+    ctx="${2:-$(act_name "$(current_id)")}"
+    exec helium --profile-directory="$(ctx_profile "$ctx")"
+    ;;
+*)
+    cat >&2 <<'EOF'
+usage: kde-ctx <command>
+  current          print the current activity's name (default)
+  id               print the current activity's uuid
+  list             uuid<TAB>name for every activity
+  switch <name>    switch to the named activity (case-insensitive)
+  term [ctx]       ghostty on the context's herdr work session + repo dir
+  browser [ctx]    helium with the context's profile
+                   (ctx defaults to the current activity)
+EOF
+    exit 2
+    ;;
+esac
