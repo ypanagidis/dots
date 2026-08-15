@@ -48,5 +48,8 @@
   # User-facing CLI tools that are not provided by a richer HM program module.
   home.packages = with pkgs; [
     fastfetch
+    # Clipboard CLI — also what Claude Code and other TUIs use to read/write
+    # image clipboard content under Wayland.
+    wl-clipboard
   ];
 }

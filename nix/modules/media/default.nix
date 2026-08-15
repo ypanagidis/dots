@@ -8,19 +8,8 @@
     spotify
   ];
 
-  xdg.desktopEntries.spotify = {
-    name = "Spotify";
-    genericName = "Music Player";
-    icon = "spotify-client";
-    exec = "env -u NIXOS_OZONE_WL spotify --ozone-platform=x11 %U";
-    terminal = false;
-    mimeType = [ "x-scheme-handler/spotify" ];
-    categories = [
-      "Audio"
-      "Music"
-      "Player"
-      "AudioVideo"
-    ];
-    settings.StartupWMClass = "spotify";
-  };
+  # No desktop-entry override: with the global NIXOS_OZONE_WL=1 the spotify
+  # wrapper unsets DISPLAY and CEF runs native Wayland. The old CachyOS-era
+  # XWayland workaround (env -u NIXOS_OZONE_WL + --ozone-platform=x11) lives
+  # in git history if the 5K flicker ever comes back.
 }
