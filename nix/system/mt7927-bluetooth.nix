@@ -241,21 +241,22 @@ let
           "\t} else if (dev_id == 0x7925 || dev_id == 0x6639) {",
       )
 
+      # Kernel 6.18 turned the truncated-FUNC_CTRL-event path from a hard
+      # -EINVAL into ON_UNDONE; the MT6639 still needs it treated as ON_DONE.
       replace_once(
           "module-src/btmtk.c",
           "\t\tif (!skb_pull_data(data->evt_skb,\n"
           "\t\t\t\t   sizeof(wmt_evt_funcc->status))) {\n"
-          "\t\t\terr = -EINVAL;\n"
-          "\t\t\tgoto err_free_skb;\n"
+          "\t\t\tstatus = BTMTK_WMT_ON_UNDONE;\n"
+          "\t\t\tbreak;\n"
           "\t\t}",
           "\t\tif (!skb_pull_data(data->evt_skb,\n"
           "\t\t\t\t   sizeof(wmt_evt_funcc->status))) {\n"
-          "\t\t\tif (data->dev_id == 0x6639) {\n"
+          "\t\t\tif (data->dev_id == 0x6639)\n"
           "\t\t\t\tstatus = BTMTK_WMT_ON_DONE;\n"
-          "\t\t\t\tbreak;\n"
-          "\t\t\t}\n"
-          "\t\t\terr = -EINVAL;\n"
-          "\t\t\tgoto err_free_skb;\n"
+          "\t\t\telse\n"
+          "\t\t\t\tstatus = BTMTK_WMT_ON_UNDONE;\n"
+          "\t\t\tbreak;\n"
           "\t\t}",
       )
 
