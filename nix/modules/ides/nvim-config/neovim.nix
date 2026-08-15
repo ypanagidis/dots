@@ -19,6 +19,7 @@
     # Needed by lazy.nvim (git fetches) and nvim-treesitter (grammar builds).
     git
     gcc
+    tree-sitter
 
     # LSP servers
     typescript

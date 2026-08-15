@@ -1,6 +1,9 @@
     window-rule {
         geometry-corner-radius 20 // Set every window radius to 20
         clip-to-geometry true
+        // Keep the focus ring outside translucent windows. Niri otherwise
+        // draws a solid ring-colored rectangle behind the entire surface.
+        draw-border-with-background false
     }
 
     // Personal apps start fullscreen on the first context workspace.

@@ -3,14 +3,14 @@
 This setup is driven by one dispatcher:
 
 ```sh
-/home/yiannis/.local/bin/niri-ctx
+niri-ctx
 ```
 
-Since 2026-07-05 that is a symlink to the **Rust dispatcher**
-(`rust/niri-ctx/target/release/niri-ctx`, built by `install.sh`). The original
-Bash implementation stays at `bin/niri-ctx`: it is the instant rollback
-(`./install.sh --bash`) and still owns the in-terminal session attach
-(`--tmux-role`), which the Rust dispatcher execs.
+On NixOS the Rust dispatcher is built as a Nix package. On non-Nix systems,
+`install.sh` builds it under `rust/niri-ctx/target/release/` and links it into
+`~/.local/bin`. The original Bash implementation stays at `bin/niri-ctx`: it
+is the instant non-Nix rollback (`./install.sh --bash`) and still owns the
+in-terminal session attach (`--tmux-role`), which the Rust dispatcher execs.
 
 The niri config lives in this repo, and `~/.config/niri` is expected to point
 here. Project-specific settings are in `.config/niri/contexts.conf` — the Rust
@@ -163,7 +163,7 @@ CTX_REPOS[Admin]="term=$HOME"
 CTX_HELIUM_PROFILE=( [UP]="Profile 1" [Webroot]="Profile 3" ... )
 
 MAIN_OUTPUT="DP-1"  TOP_OUTPUT="DP-2"  COMMS_OUTPUT="HDMI-A-1"
-HELIUM_BIN="${HELIUM_BIN:-/opt/helium-browser-bin/helium}"
+HELIUM_BIN="${HELIUM_BIN:-helium}"
 CONTEXT_TERMINAL="${NIRI_CONTEXT_TERMINAL:-ghostty}"
 SESSION_BACKEND="herdr"
 TOP_FOLLOW="off"

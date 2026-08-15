@@ -53,6 +53,14 @@
       url = "github:mattpocock/skills";
       flake = false;
     };
+
+    # Package niri-ctx from the pushed workspace source. The local Rust and
+    # Bash bridge match this branch; pinning it in flake.lock keeps nested
+    # path-flake evaluation pure and machine-independent.
+    niri-workspace = {
+      url = "github:ypanagidis/dots/niri";
+      flake = false;
+    };
   };
 
   outputs =

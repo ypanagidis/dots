@@ -1,9 +1,10 @@
 { ... }:
 
 {
-  # Main is KDE-only now. Niri experiments were removed from this branch and
-  # remain available on `multihost-config`.
+  # Plasma remains the default desktop. Niri is an independent login session;
+  # its shell and workflow helpers only start after selecting Niri in SDDM.
   imports = [
     ./kde.nix
+    ./niri.nix
   ];
 }

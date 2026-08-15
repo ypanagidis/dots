@@ -325,6 +325,23 @@
         "type": "github"
       }
     },
+    "niri-workspace": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1786754452,
+        "narHash": "sha256-nxxp8oW7dXUWyO2zFN+XAADmI+ARCvHXWea56Kc2TzI=",
+        "owner": "ypanagidis",
+        "repo": "dots",
+        "rev": "63925c77bd7075dbdd7117862c50777006c2e215",
+        "type": "github"
+      },
+      "original": {
+        "owner": "ypanagidis",
+        "ref": "niri",
+        "repo": "dots",
+        "type": "github"
+      }
+    },
     "nix-filter": {
       "locked": {
         "lastModified": 1731533336,
@@ -556,6 +573,7 @@
         "home-manager": "home-manager",
         "llm-agents": "llm-agents",
         "mattpocock-skills": "mattpocock-skills",
+        "niri-workspace": "niri-workspace",
         "nixpkgs": "nixpkgs_5",
         "plasma-manager": "plasma-manager"
       }

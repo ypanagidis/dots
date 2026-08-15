@@ -1,0 +1,146 @@
+diff --git a/src/backend/allocator/swapchain.rs b/src/backend/allocator/swapchain.rs
+index a937c2fe..c1ffc8d1 100644
+--- a/src/backend/allocator/swapchain.rs
++++ b/src/backend/allocator/swapchain.rs
+@@ -118,7 +118,7 @@ impl<B: Buffer + AsDmabuf> AsDmabuf for Slot<B> {
+         let maybe_dmabuf = self.userdata().get::<Dmabuf>();
+         if maybe_dmabuf.is_none() {
+             let dmabuf = (**self).export()?;
+-            self.userdata().insert_if_missing(|| dmabuf);
++            self.userdata().insert_if_missing_threadsafe(|| dmabuf);
+         }
+ 
+         Ok(self.userdata().get::<Dmabuf>().cloned().unwrap())
+diff --git a/src/backend/drm/surface/gbm.rs b/src/backend/drm/surface/gbm.rs
+index 56120ba4..42867902 100644
+--- a/src/backend/drm/surface/gbm.rs
++++ b/src/backend/drm/surface/gbm.rs
+@@ -212,7 +212,7 @@ where
+             Ok(dmabuf) => dmabuf,
+             Err(err) => return Err((swapchain.allocator, err.into())),
+         };
+-        buffer.userdata().insert_if_missing(|| fb);
++        buffer.userdata().insert_if_missing_threadsafe(|| fb);
+ 
+         let handle = buffer.userdata().get::<GbmFramebuffer>().unwrap();
+ 
+@@ -266,7 +266,7 @@ where
+             if maybe_buffer.is_none() {
+                 let fb = framebuffer_from_bo(self.drm.device_fd(), &slot, self.is_opaque)
+                     .map_err(|err| Error::DrmError(err.into()))?;
+-                slot.userdata().insert_if_missing(|| fb);
++                slot.userdata().insert_if_missing_threadsafe(|| fb);
+             }
+ 
+             self.next_fb = Some(slot);
+diff --git a/src/backend/renderer/gles/mod.rs b/src/backend/renderer/gles/mod.rs
+index 15f9a83f..a7397987 100644
+--- a/src/backend/renderer/gles/mod.rs
++++ b/src/backend/renderer/gles/mod.rs
+@@ -957,7 +957,8 @@ impl ImportMemWl for GlesRenderer {
+                         ptr.offset(offset as isize) as *const _,
+                     );
+                 } else {
+-                    for region in damage.iter() {
++                    let buffer_rect = Rectangle::from_size(Size::from((width, height)));
++                    for region in damage.iter().filter_map(|r| r.intersection(buffer_rect)) {
+                         trace!("Uploading partial shm texture");
+                         self.gl.PixelStorei(ffi::UNPACK_SKIP_PIXELS, region.loc.x);
+                         self.gl.PixelStorei(ffi::UNPACK_SKIP_ROWS, region.loc.y);
+@@ -1265,7 +1266,15 @@ impl ImportDma for GlesRenderer {
+                 .create_image_from_dmabuf(buffer)
+                 .map_err(GlesError::BindBufferEGLError)?;
+ 
+-            let tex = self.import_egl_image(image, is_external, None)?;
++            let tex = match self.import_egl_image(image, is_external, None) {
++                Ok(tex) => tex,
++                Err(err) => {
++                    unsafe {
++                        ffi_egl::DestroyImageKHR(**self.egl.display().get_display_handle(), image);
++                    }
++                    return Err(err);
++                }
++            };
+             let format = fourcc_to_gl_formats(buffer.format().code)
+                 .map(|(internal, _, _)| internal)
+                 .unwrap_or(ffi::RGBA8);
+@@ -1361,13 +1370,13 @@ impl ExportMem for GlesRenderer {
+ 
+         let (_, has_alpha) = target.0.format().ok_or(GlesError::UnknownPixelFormat)?;
+         let (_, format, layout) = fourcc_to_gl_formats(fourcc).ok_or(GlesError::UnknownPixelFormat)?;
++        let bpp = gl_bpp(format, layout).ok_or(GlesError::UnsupportedPixelLayout)? / 8;
+ 
+         let mut pbo = 0;
+         let err = unsafe {
+             self.gl.GetError(); // clear errors
+             self.gl.GenBuffers(1, &mut pbo);
+             self.gl.BindBuffer(ffi::PIXEL_PACK_BUFFER, pbo);
+-            let bpp = gl_bpp(format, layout).ok_or(GlesError::UnsupportedPixelLayout)? / 8;
+             let size = (region.size.w * region.size.h * bpp as i32) as isize;
+             self.gl
+                 .BufferData(ffi::PIXEL_PACK_BUFFER, size, ptr::null(), ffi::STREAM_DRAW);
+@@ -1401,8 +1410,14 @@ impl ExportMem for GlesRenderer {
+                 mapping: AtomicPtr::new(ptr::null_mut()),
+                 destruction_callback_sender: self.gles_cleanup().sender.clone(),
+             }),
+-            ffi::INVALID_ENUM | ffi::INVALID_OPERATION => Err(GlesError::UnsupportedPixelFormat(fourcc)),
+-            _ => Err(GlesError::UnknownPixelFormat),
++            err => {
++                unsafe { self.gl.DeleteBuffers(1, &pbo) };
++                Err(if matches!(err, ffi::INVALID_ENUM | ffi::INVALID_OPERATION) {
++                    GlesError::UnsupportedPixelFormat(fourcc)
++                } else {
++                    GlesError::UnknownPixelFormat
++                })
++            }
+         }
+     }
+ 
+@@ -1461,8 +1476,14 @@ impl ExportMem for GlesRenderer {
+                 mapping: AtomicPtr::new(ptr::null_mut()),
+                 destruction_callback_sender: self.gles_cleanup().sender.clone(),
+             }),
+-            ffi::INVALID_ENUM | ffi::INVALID_OPERATION => Err(GlesError::UnsupportedPixelFormat(fourcc)),
+-            _ => Err(GlesError::UnknownPixelFormat),
++            err => {
++                unsafe { self.gl.DeleteBuffers(1, &pbo) };
++                Err(if matches!(err, ffi::INVALID_ENUM | ffi::INVALID_OPERATION) {
++                    GlesError::UnsupportedPixelFormat(fourcc)
++                } else {
++                    GlesError::UnknownPixelFormat
++                })
++            }
+         }
+     }
+ 
+diff --git a/src/backend/renderer/multigpu/mod.rs b/src/backend/renderer/multigpu/mod.rs
+index 59b9fe7e..42802e42 100644
+--- a/src/backend/renderer/multigpu/mod.rs
++++ b/src/backend/renderer/multigpu/mod.rs
+@@ -1673,6 +1673,13 @@ struct MultiTextureInternal {
+ //  Type erasure just forces us to do this instead.
+ unsafe impl Send for MultiTextureInternal {}
+ 
++#[cfg(feature = "wayland_frontend")]
++pub(crate) fn clear_surface_textures(states: &crate::wayland::compositor::SurfaceData) {
++    if let Some(texture) = states.data_map.get::<Arc<Mutex<MultiTextureInternal>>>() {
++        texture.lock().unwrap().textures.clear();
++    }
++}
++
+ type DamageAnyTextureMappings = Vec<(Rectangle<i32, BufferCoords>, Box<dyn Any + 'static>)>;
+ 
+ #[derive(Debug)]
+diff --git a/src/backend/renderer/utils/wayland.rs b/src/backend/renderer/utils/wayland.rs
+index f5ce1410..3434e3c2 100644
+--- a/src/backend/renderer/utils/wayland.rs
++++ b/src/backend/renderer/utils/wayland.rs
+@@ -404,6 +404,8 @@ pub fn on_commit_buffer_handler<D: 'static>(surface: &WlSurface) {
+                     {
+                         state.reset();
+                     }
++                    #[cfg(feature = "renderer_multi")]
++                    crate::backend::renderer::multigpu::clear_surface_textures(data);
+                 });
+             });
+         }

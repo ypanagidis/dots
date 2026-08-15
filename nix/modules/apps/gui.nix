@@ -16,6 +16,8 @@ in
     lib.optionals pkgs.stdenv.hostPlatform.isLinux
     (with pkgs; [
       discord
+      slack
+      telegram-desktop
       libreoffice-fresh
       pavucontrol
       remmina
@@ -24,6 +26,15 @@ in
       bruno
       obsidian
     ]);
+
+  # Niri's running environment has ~/.local/bin but does not see a newly
+  # activated Home Manager profile until the next system activation/login.
+  # Keep the comms launch names used by niri-ctx available immediately.
+  home.file = lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
+    ".local/bin/slack".source = lib.getExe pkgs.slack;
+    ".local/bin/Telegram".source = lib.getExe pkgs.telegram-desktop;
+    ".local/bin/telegram-desktop".source = lib.getExe pkgs.telegram-desktop;
+  };
 
   # Native-Wayland Electron missizes Discord's maximized surface on the
   # rotated portrait ultrawide and crops the right edge — at any output scale

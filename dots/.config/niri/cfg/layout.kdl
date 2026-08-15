@@ -2,7 +2,7 @@
         gaps 12 // Gap between full-screen workflow cards
         center-focused-column "always"
 
-        background-color "transparent" // <- needed for noctalia-shell to set wallpaper
+        background-color "transparent" // needed for Noctalia to set the wallpaper
 
         preset-column-widths {
             proportion 1.0

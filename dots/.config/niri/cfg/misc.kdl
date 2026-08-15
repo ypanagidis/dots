@@ -2,7 +2,6 @@
     screenshot-path null
 
     environment {
-        PATH "/home/yiannis/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl"
         ELECTRON_OZONE_PLATFORM_HINT "auto"
         QT_QPA_PLATFORM "wayland"
         QT_QPA_PLATFORMTHEME "gtk3"

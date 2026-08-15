@@ -277,11 +277,22 @@ fn which(bin: &str) -> Option<PathBuf> {
 }
 
 fn installed_dispatcher_path() -> Result<PathBuf> {
-    let home = std::env::var_os("HOME")
-        .map(PathBuf::from)
-        .ok_or_else(|| NiriCtxError::Config("HOME is not set".to_string()))?;
-    Ok(home.join(".local/bin/niri-ctx"))
+    std::env::current_exe()
+        .map_err(|source| NiriCtxError::io("resolve current niri-ctx executable", source))
 }
 
 #[allow(dead_code)]
 fn _uses_app_config(_app: &CommsAppConfig) {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn terminal_reentry_uses_the_running_dispatcher() {
+        assert_eq!(
+            installed_dispatcher_path().unwrap(),
+            std::env::current_exe().unwrap()
+        );
+    }
+}
