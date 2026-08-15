@@ -78,8 +78,15 @@ in
       kwin."Show Desktop" = "Meta+D";
       kwin."Switch One Desktop Down" = "Meta+Ctrl+Down";
       kwin."Switch One Desktop Up" = "Meta+Ctrl+Up";
-      kwin."Switch One Desktop to the Left" = "Meta+Ctrl+Left";
-      kwin."Switch One Desktop to the Right" = "Meta+Ctrl+Right";
+      # Hyper+H/L scroll the focused screen's desktops — niri muscle memory.
+      kwin."Switch One Desktop to the Left" = [
+        "Meta+Ctrl+Left"
+        "Meta+Ctrl+Alt+Shift+H"
+      ];
+      kwin."Switch One Desktop to the Right" = [
+        "Meta+Ctrl+Right"
+        "Meta+Ctrl+Alt+Shift+L"
+      ];
       kwin."Switch Window Down" = "Meta+Alt+Down";
       kwin."Switch Window Left" = "Meta+Alt+Left";
       kwin."Switch Window Right" = "Meta+Alt+Right";
@@ -205,8 +212,15 @@ in
       plasmashell.clipboard_action = "Meta+Ctrl+X";
       plasmashell.cycle-panels = "Meta+Alt+P";
       plasmashell."manage activities" = "Meta+Q";
-      plasmashell."next activity" = "Meta+A";
-      plasmashell."previous activity" = "Meta+Shift+A";
+      # Hyper+J/K move down/up the activity (context) list — niri muscle memory.
+      plasmashell."next activity" = [
+        "Meta+A"
+        "Meta+Ctrl+Alt+Shift+J"
+      ];
+      plasmashell."previous activity" = [
+        "Meta+Shift+A"
+        "Meta+Ctrl+Alt+Shift+K"
+      ];
       ActivityManager."switch-to-activity-7cd1ec6d-2640-4af9-8e0f-36858842803d" = "Meta+Ctrl+1";
       ActivityManager."switch-to-activity-a205ecff-1dcf-4f19-84e9-b12ac444c66d" = "Meta+Ctrl+2";
       ActivityManager."switch-to-activity-3cc4025f-62c5-4d35-bad7-2eeac5962746" = "Meta+Ctrl+3";
