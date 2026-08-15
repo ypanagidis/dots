@@ -211,9 +211,16 @@ in
       plasmashell.show-on-mouse-pos = "Meta+V";
       "services/org.kde.spectacle.desktop"._launch = [
         "Print"
-        "Meta+Shift+S"
         "Ctrl+#"
       ];
+    };
+    # Meta+Shift+S: draw a region, image lands on the clipboard, no window —
+    # same flow as the old grim/slurp binding on niri. (-r region, -b no GUI,
+    # -c clipboard)
+    hotkeys.commands.spectacle-region-clipboard = {
+      name = "Region screenshot to clipboard";
+      key = "Meta+Shift+S";
+      command = "spectacle -r -b -c";
     };
     window-rules = [
       {
@@ -286,11 +293,12 @@ in
       katerc.lspclient.TypeFormatting = false;
       kcminputrc.Keyboard.RepeatDelay = 200;
       kcminputrc.Keyboard.RepeatRate = 50;
-      kcminputrc."Libinput/1133/50504/Logitech USB Receiver Mouse".NaturalScroll = true;
-      kcminputrc."Libinput/1133/45108/Logitech MX Master 3S".NaturalScroll = true;
+      # Applies to every pointer device (KWin's [Libinput][Defaults][Pointer]
+      # fallback) — no more per-mouse vendor/product entries.
+      kcminputrc."Libinput/Defaults/Pointer".NaturalScroll = true;
       kded5rc.Module-browserintegrationreminder.autoload = false;
       kded5rc.Module-device_automounter.autoload = false;
-      kdeglobals.General.TerminalApplication = "/nix/store/k3wrd5n1a709fkhrv52mwnxqyabl55jw-ghostty-1.2.3/bin/ghostty --gtk-single-instance=true";
+      kdeglobals.General.TerminalApplication = "${pkgs.ghostty}/bin/ghostty --gtk-single-instance=true";
       kdeglobals.General.TerminalService = "com.mitchellh.ghostty.desktop";
       kdeglobals."KFileDialog Settings"."Allow Expansion" = false;
       kdeglobals."KFileDialog Settings"."Automatically select filename extension" = true;
@@ -356,11 +364,19 @@ in
       plasmanotifyrc."Applications/google-chrome".Seen = true;
       plasmanotifyrc."Applications/helium".Seen = true;
       plasmarc.Wallpapers.usersWallpapers = "";
-      "plasma-org.kde.plasma.desktop-appletsrc"."Containments/3/Applets/30/Configuration/General".launchers =
+      # NOTE: applet IDs are machine-specific — 4/7 is the icontasks applet on
+      # this install (was 3/30 on the old machine). If the panel is ever
+      # recreated, re-check with: grep -B20 icontasks plasma-org...appletsrc
+      "plasma-org.kde.plasma.desktop-appletsrc"."Containments/4/Applets/7/Configuration/General".launchers =
         {
           value = "applications:helium.desktop,applications:com.mitchellh.ghostty.desktop,applications:discord.desktop,applications:spotify.desktop,applications:obsidian.desktop,applications:datagrip.desktop,applications:bruno.desktop,applications:systemsettings.desktop,preferred://filemanager";
           escapeValue = false;
         };
+      # Capture the region on mouse release — no separate Accept click.
+      spectaclerc.General.useReleaseToCapture = true;
+      # Klipper drops image clipboard entries by default; without this the
+      # screenshot vanishes from the clipboard the moment spectacle -b exits.
+      klipperrc.General.IgnoreImages = false;
       spectaclerc.Annotations.annotationToolType = 9;
       spectaclerc.Annotations.highlighterStrokeWidth = 27;
       spectaclerc.ImageSave.lastImageSaveLocation = "file:///home/yiannis/Pictures/Screenshots/Screenshot_20260129_020102.png";
