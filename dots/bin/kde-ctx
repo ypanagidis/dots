@@ -85,7 +85,11 @@ info)
     ;;
 browser)
     # Helium with the context's profile (CTX_HELIUM_PROFILE in contexts.conf).
+    # Step to the active screen's next desktop first so the browser lands
+    # there — the niri "browser in the next column" flow. On the last desktop
+    # this is a no-op and the browser opens on the current one.
     ctx="${2:-$(act_name "$(current_id)")}"
+    qdbus org.kde.KWin /KWin org.kde.KWin.nextDesktop >/dev/null 2>&1 || true
     exec helium --profile-directory="$(ctx_profile "$ctx")"
     ;;
 *)

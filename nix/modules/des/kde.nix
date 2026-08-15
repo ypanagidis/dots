@@ -175,14 +175,9 @@ in
         "Alt+F1"
         "Alt+Space"
       ];
-      plasmashell."activate task manager entry 1" = [
-        "Meta+1"
-        "Meta+Ctrl+Alt+Shift+A"
-      ];
-      plasmashell."activate task manager entry 2" = [
-        "Meta+2"
-        "Meta+Ctrl+Alt+Shift+C"
-      ];
+      # Hyper+A/C moved to the kde-ctx launchers (hotkeys.commands below).
+      plasmashell."activate task manager entry 1" = "Meta+1";
+      plasmashell."activate task manager entry 2" = "Meta+2";
       plasmashell."activate task manager entry 3" = [
         "Meta+3"
         "Meta+Ctrl+Alt+Shift+D"
@@ -236,16 +231,16 @@ in
     # Meta+Shift+S: draw a region, image lands on the clipboard, no window —
     # same flow as the old grim/slurp binding on niri. (-r region, -b no GUI,
     # -c clipboard)
-    # Context launchers: Hyper+Return/B open the current activity's herdr
-    # work terminal / helium profile (see dots/bin/kde-ctx).
+    # Context launchers (niri muscle memory): Hyper+C terminal on the current
+    # desktop, Hyper+A browser on the NEXT desktop of the active screen.
     hotkeys.commands.kde-ctx-term = {
       name = "Context terminal (herdr work session)";
-      key = "Meta+Ctrl+Alt+Shift+Return";
+      key = "Meta+Ctrl+Alt+Shift+C";
       command = "/home/yiannis/.local/bin/kde-ctx term";
     };
     hotkeys.commands.kde-ctx-browser = {
       name = "Context browser (helium profile)";
-      key = "Meta+Ctrl+Alt+Shift+B";
+      key = "Meta+Ctrl+Alt+Shift+A";
       command = "/home/yiannis/.local/bin/kde-ctx browser";
     };
     hotkeys.commands.spectacle-region-clipboard = {
@@ -387,6 +382,9 @@ in
       # fullscreen-ish windows and Meta+Ctrl+Left/Right this approximates
       # niri's per-output scrolling strip.
       kwinrc.Windows.PerOutputVirtualDesktops = true;
+      # New windows open on the screen the mouse is on — niri's mouse-driven
+      # output model, instead of "primary display" or last-focused guessing.
+      kwinrc.Windows.ActiveMouseScreen = true;
       kwinrc.Tiling."[Tiling][6c7ed35d-a893-4861-a4d8-e10caa85be7d][]" = "";
       kwinrc.Tiling.padding = 4;
       kwinrc.Tiling.tiles = "{\"layoutDirection\":\"horizontal\",\"tiles\":[{\"width\":0.25},{\"width\":0.5},{\"width\":0.25}]}";
