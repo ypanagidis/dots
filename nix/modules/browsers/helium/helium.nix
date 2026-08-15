@@ -101,7 +101,7 @@ let
   };
 
   # Extract AppImage contents using appimageTools
-  appimageContents = appimageTools.extractType2 { inherit pname version src; };
+  appimageContents = appimageTools.extract { inherit pname version src; };
 
   opusWithCustomModes = libopus.override { withCustomModes = true; };
 

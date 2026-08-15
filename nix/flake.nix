@@ -24,6 +24,11 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    # Terminal session daemon (zero-loss reattach when the terminal dies).
+    # Config is dots/.config/herdr via dots.nix; kept on its own nixpkgs pin
+    # since it builds with a rust-overlay toolchain.
+    herdr.url = "github:herdrdev/herdr";
+
     plasma-manager = {
       url = "github:nix-community/plasma-manager";
       inputs.nixpkgs.follows = "nixpkgs";

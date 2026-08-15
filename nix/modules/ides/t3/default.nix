@@ -12,7 +12,7 @@ lib.mkIf pkgs.stdenv.hostPlatform.isLinux (
       inherit version src;
     };
 
-    t3Contents = pkgs.appimageTools.extractType2 {
+    t3Contents = pkgs.appimageTools.extract {
       pname = "t3-code";
       inherit version src;
     };

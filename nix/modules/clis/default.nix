@@ -5,6 +5,7 @@
     ./tmux.nix
     ./btop
     ./shell
+    ./herdr.nix
   ];
 
   programs = {
