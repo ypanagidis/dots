@@ -6,7 +6,7 @@ alias wr="cd ~/Developer/Work/Webroot/"
 alias n="nvim"
 alias lg="lazygit"
 alias c="claude --dangerously-skip-permissions"
-alias mend='fnm exec --using 26.4.0 node ~/Developer/OSS/Sealant/Mend/apps/cli/dist/main.js'
+alias mend='node ~/Developer/OSS/Sealant/Mend/apps/cli/dist/main.js'
 
 if command -v eza >/dev/null 2>&1; then
   alias l="eza --icons=always"
