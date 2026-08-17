@@ -309,22 +309,6 @@
         "type": "github"
       }
     },
-    "mattpocock-skills": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1779266813,
-        "narHash": "sha256-Qwuu27f95xgAJ4hdv/4TNahHhprCMIxl1H9f9ymEsno=",
-        "owner": "mattpocock",
-        "repo": "skills",
-        "rev": "b8be62ffacb0118fa3eaa29a0923c87c8c11985c",
-        "type": "github"
-      },
-      "original": {
-        "owner": "mattpocock",
-        "repo": "skills",
-        "type": "github"
-      }
-    },
     "niri-workspace": {
       "flake": false,
       "locked": {
@@ -572,7 +556,6 @@
         "herdr": "herdr",
         "home-manager": "home-manager",
         "llm-agents": "llm-agents",
-        "mattpocock-skills": "mattpocock-skills",
         "niri-workspace": "niri-workspace",
         "nixpkgs": "nixpkgs_5",
         "plasma-manager": "plasma-manager"

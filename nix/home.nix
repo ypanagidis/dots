@@ -10,7 +10,7 @@
   imports = [
     ./modules/dots.nix
     ./modules/dev/base.nix
-    ./modules/dev/ai.nix
+    ./modules/dev/ai
     ./modules/apps/gui.nix
     ./modules/media
     ./modules/gaming

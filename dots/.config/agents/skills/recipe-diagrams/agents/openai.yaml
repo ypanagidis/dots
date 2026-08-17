@@ -1,0 +1,6 @@
+interface:
+  display_name: "Recipe Diagrams"
+  short_description: "Render a recipe as a 4K process-flow diagram"
+  default_prompt: "Use $recipe-diagrams to turn this recipe into a 4K process-flow diagram."
+policy:
+  allow_implicit_invocation: false
