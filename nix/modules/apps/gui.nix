@@ -7,15 +7,28 @@
 
 let
   home = config.home.homeDirectory;
+
+  # Discord's native Linux monitor capture imports niri's DMA-BUF stream with
+  # Vulkan. The nixpkgs FHS wrapper sets the Vulkan ICD path but omits the
+  # loader itself, so Discord falls back to SHM, which niri does not expose for
+  # full-output capture ("no more input formats"). Keep the FHS environment and
+  # add only the missing loader.
+  discordWithVulkan = pkgs.discord.override {
+    unwrappedDiscord = pkgs.discord.passthru.unwrappedDiscord.overrideAttrs (oldAttrs: {
+      passthru = oldAttrs.passthru // {
+        targetPkgs = packages: oldAttrs.passthru.targetPkgs packages ++ [ packages.vulkan-loader ];
+      };
+    });
+  };
 in
 
 {
   # User-facing desktop applications. These do not need to be system packages,
   # so they live in the Home Manager profile.
-  home.packages =
-    lib.optionals pkgs.stdenv.hostPlatform.isLinux
-    (with pkgs; [
-      discord
+  home.packages = lib.optionals pkgs.stdenv.hostPlatform.isLinux (
+    with pkgs;
+    [
+      discordWithVulkan
       slack
       telegram-desktop
       libreoffice-fresh
@@ -25,7 +38,8 @@ in
       haruna
       bruno
       obsidian
-    ]);
+    ]
+  );
 
   # Niri's running environment has ~/.local/bin but does not see a newly
   # activated Home Manager profile until the next system activation/login.
