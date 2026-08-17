@@ -29,7 +29,6 @@ This catalogs package, app, tool, plugin, and runtime library declarations curre
 | Steam | `modules/steam.nix` | `steam`, `proton-ge-bin`, `gamemode`, `steam-hardware` |
 | Sunshine | `modules/sunshine.nix` | `sunshine.override { cudaSupport = true; }` |
 | KDE Connect | `modules/kdeconnect.nix` | `kdeconnect` |
-| Apple Studio Display helper | `modules/crapple-display.nix` | local `asdbctl`, `pkg-config`, `udev` |
 | MT7927 Bluetooth kernel modules | `system/mt7927-bluetooth.nix` | local `mt7927-bluetooth-modules`, `kernel.moduleBuildDependencies`, `python3` |
 | MT7927 firmware derivations | `system/mt7927-bluetooth.nix` | local `mt7927-bluetooth-firmware`, `python3` |
 | MT7927 check script | `system/mt7927-bluetooth.nix` | `mt7927-bt-check`, `kmod`, `ripgrep`, `systemd`, `coreutils`, `bluez`, `util-linux` |

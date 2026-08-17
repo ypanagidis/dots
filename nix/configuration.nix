@@ -22,7 +22,6 @@
     # Focused system modules that also declare their own helper packages.
     ./modules/minecraft.nix
     ./modules/steam.nix
-    ./modules/crapple-display.nix
     ./modules/kdeconnect.nix
     ./modules/sunshine.nix
   ];
@@ -58,9 +57,9 @@
   ];
 
   boot.kernelParams = [
-    "mem_sleep_default=s2idle"
+    # Prefer ACPI S3 suspend-to-RAM over the shallower s2idle mode.
+    "mem_sleep_default=deep"
     "nvidia.NVreg_PreserveVideoMemoryAllocations=1"
-    "pci=realloc=on,pcie_bus_perf,hpbussize=32"
   ];
 
   # Swap lives in compressed RAM like the old CachyOS setup; no swap partition.
@@ -116,36 +115,14 @@
   # user. Keep the daemon available so the CLI can connect on demand.
   services.nordvpn.enable = true;
 
-  # Hardware toggles stay host-level because they describe devices attached to
-  # this desktop, while their helper packages live in the relevant modules.
-  hardware.apple-studio-display.enable = true;
-
   services.hardware.openrgb.enable = true;
-  services.hardware.bolt.enable = true;
   programs.coolercontrol.enable = true;
-
-  systemd.services.thunderbolt-rebind = {
-    description = "Rebind Thunderbolt controller after resume";
-    after = [ "post-resume.target" ];
-    wantedBy = [ "post-resume.target" ];
-    path = [ pkgs.pciutils ];
-    serviceConfig = {
-      Type = "oneshot";
-      ExecStart = "${pkgs.bash}/bin/bash -c 'dev=$(lspci -D | grep \"ASM4242 PCIe Switch Upstream\" | cut -d\" \" -f1); echo 1 > /sys/bus/pci/devices/$dev/remove; sleep 2; echo 1 > /sys/bus/pci/rescan'";
-    };
-  };
 
   environment.sessionVariables = {
     _JAVA_AWT_WM_NONREPARENTING = "1";
     MOZ_ENABLE_WAYLAND = "1";
     NIXOS_OZONE_WL = "1";
   };
-
-  powerManagement.powerDownCommands = ''
-    for dev in /sys/bus/pci/devices/*/power/wakeup; do
-      echo disabled > "$dev" 2>/dev/null || true
-    done
-  '';
 
   # Fresh install (Aug 2026, tracking unstable between 26.05 and 26.11).
   system.stateVersion = "26.05";

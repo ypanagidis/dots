@@ -42,11 +42,8 @@ These are not long package lists, but they still cause NixOS to pull in services
 | Printing | `configuration.nix` | `services.printing.enable = true` enables CUPS printing support. |
 | Avahi / mDNS | `configuration.nix` | `services.avahi` enables local network discovery and address publishing. |
 | NordVPN service | `configuration.nix`, `custom-packages/flake.nix` | `services.nordvpn.enable = true` keeps the CLI/daemon usable on demand. Autoconnect should be disabled through NordVPN's own settings. |
-| Apple Studio Display toggle | `configuration.nix`, `modules/crapple-display.nix` | `hardware.apple-studio-display.enable = true` activates the local `asdbctl` helper and udev rules. |
 | OpenRGB service | `configuration.nix` | `services.hardware.openrgb.enable = true`; CLI package is listed in `modules/system/base-packages.nix`. |
-| Thunderbolt service | `configuration.nix` | `services.hardware.bolt.enable = true` enables Thunderbolt device management. |
 | CoolerControl service | `configuration.nix` | `programs.coolercontrol.enable = true` enables cooler/fan control integration. |
-| Thunderbolt rebind helper | `configuration.nix` | Uses `pkgs.pciutils` and `pkgs.bash` through a systemd service after resume. |
 
 ## Generated Hardware Declarations
 
@@ -75,7 +72,6 @@ These are not long package lists, but they still cause NixOS to pull in services
 | Steam | `modules/steam.nix` | `steam`, `proton-ge-bin`, `gamemode`, `steam-hardware` |
 | Sunshine | `modules/sunshine.nix` | `sunshine.override { cudaSupport = true; }`, with `autoStart = false` so it stays configured but does not open on boot. |
 | KDE Connect | `modules/kdeconnect.nix` | `kdeconnect` |
-| Apple Studio Display helper | `modules/crapple-display.nix` | local `asdbctl`, `pkg-config`, `udev` |
 | MT7927 Bluetooth kernel modules | `system/mt7927-bluetooth.nix` | local `mt7927-bluetooth-modules`, `kernel.moduleBuildDependencies`, `python3` |
 | MT7927 firmware derivations | `system/mt7927-bluetooth.nix` | local `mt7927-bluetooth-firmware`, `python3` |
 | MT7927 check script | `system/mt7927-bluetooth.nix` | `mt7927-bt-check`, `kmod`, `ripgrep`, `systemd`, `coreutils`, `bluez`, `util-linux` |

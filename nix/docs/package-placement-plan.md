@@ -30,7 +30,7 @@ This was the proposed target organization before the package move. The implement
 | `modules/media/default.nix` | Media/user tools: `ffmpeg-full`, possibly `mpv`/video tools later. |
 | `modules/gaming/default.nix` | Home/user gaming tools: `protonup-qt`, `protontricks`, `mangohud`. System gaming modules keep `steam`, `gamemode`, and PrismLauncher wrapper if you prefer system-wide. |
 | `modules/compat/electron-runtime.nix` | Rename current `modules/electron.nix`; keep `nix-ld` and Electron runtime library list here. Consider not installing `electron` itself unless you actually use the Electron binary. |
-| `packages/helium.nix`, `packages/cursor.nix`, `packages/t3-code.nix`, `packages/asdbctl.nix` | Optional future cleanup: move local package derivations out of modules so modules only install/configure packages. |
+| `packages/helium.nix`, `packages/cursor.nix`, `packages/t3-code.nix` | Optional future cleanup: move local package derivations out of modules so modules only install/configure packages. |
 | `system/mt7927-bluetooth.nix` | Keep as-is: hardware-specific kernel module/firmware/check script. |
 
 ## Proposed Moves
