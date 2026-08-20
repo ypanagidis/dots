@@ -92,7 +92,7 @@ These are not long package lists, but they still cause NixOS to pull in services
 | Shell | `modules/clis/shell/default.nix` | `zsh`, `oh-my-zsh`, `zsh-powerlevel10k`, `fzf` |
 | Tmux | `modules/clis/tmux.nix` | `tmux`, `tmuxPlugins.vim-tmux-navigator`, `tmuxPlugins.yank`, `tmuxPlugins.cpu` |
 | Btop | `modules/clis/btop/default.nix` | `btop` |
-| Terminal | `modules/terminals.nix` | `ghostty` |
+| Terminal | `modules/terminals.nix` | `alacritty`, `ghostty` (fallback) |
 | KDE Home config | `modules/des/kde.nix` | `plasma-manager` config, no direct package list |
 
 ## Boot/Session Autostart Policy

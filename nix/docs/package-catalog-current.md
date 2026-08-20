@@ -42,7 +42,7 @@ This catalogs package, app, tool, plugin, and runtime library declarations curre
 | Shell | `modules/clis/shell/default.nix` | `zsh`, `oh-my-zsh`, `zsh-powerlevel10k`, `fzf` |
 | Tmux | `modules/clis/tmux.nix` | `tmux`, `tmuxPlugins.vim-tmux-navigator`, `tmuxPlugins.yank`, `tmuxPlugins.cpu` |
 | Btop | `modules/clis/btop/default.nix` | `btop` |
-| Terminal | `modules/terminals.nix` | `ghostty` |
+| Terminal | `modules/terminals.nix` | `alacritty`, `ghostty` (fallback) |
 | Obsidian | `modules/obsedian.nix` | `obsidian` |
 | KDE Home config | `modules/des/kde.nix` | `plasma-manager` config, no direct package list |
 

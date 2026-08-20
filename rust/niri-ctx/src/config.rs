@@ -125,7 +125,7 @@ impl Config {
                 bash_fallback: repo_root.join("dots/bin/niri-ctx"),
             },
             terminal: TerminalConfig {
-                program: "ghostty".to_string(),
+                program: "alacritty".to_string(),
                 fallback: None,
             },
             browser: BrowserConfig {
@@ -641,7 +641,7 @@ declare -A CTX_HELIUM_PROFILE=(
 )
 MAIN_OUTPUT="DP-1"; TOP_OUTPUT="DP-2"; COMMS_OUTPUT="HDMI-A-1"
 HELIUM_BIN="${{HELIUM_BIN:-/opt/helium-browser-bin/helium}}"
-CONTEXT_TERMINAL="${{NIRI_CONTEXT_TERMINAL:-ghostty}}"
+CONTEXT_TERMINAL="${{NIRI_CONTEXT_TERMINAL:-alacritty}}"
 SESSION_BACKEND="${{SESSION_BACKEND:-herdr}}"
 TOP_FOLLOW="off"
 "#
@@ -660,7 +660,7 @@ TOP_FOLLOW="off"
             cfg.context(Context::Sealant).expect("sealant").repos.len(),
             2
         );
-        assert_eq!(cfg.terminal.program, "ghostty");
+        assert_eq!(cfg.terminal.program, "alacritty");
     }
 
     #[test]

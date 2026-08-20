@@ -8,12 +8,12 @@ let
   link = path: config.lib.file.mkOutOfStoreSymlink "${dots}/${path}";
 in
 {
-  # Other modules (ghostty/tmux/nvim) reuse this helper to point their
+  # Other modules (terminals/tmux/nvim) reuse this helper to point their
   # xdg.configFile at the shared dots/ tree: packages stay declarative in
   # nix, the config content has one source of truth.
   _module.args.dotsLink = link;
 
-  # Only configs with no dedicated module belong here. ghostty/tmux/nvim link
+  # Only configs with no dedicated module belong here. terminals/tmux/nvim link
   # to dots/ from their own modules (via dotsLink); zsh/btop remain nix-native
   # for now — the dots zsh plugins are embedded git checkouts that a fresh
   # clone would not include.
@@ -21,7 +21,6 @@ in
   home.file.".local/bin/kde-ctx".source = link "bin/kde-ctx";
 
   xdg.configFile = {
-    "alacritty".source = link ".config/alacritty";
     "herdr".source = link ".config/herdr";
     "lazygit".source = link ".config/lazygit";
     # Only the ignore file — programs.git (clis/default.nix) owns

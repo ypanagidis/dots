@@ -6,7 +6,10 @@ ZPLUGINDIR="${ZDOTDIR:-$HOME/.config/zsh}/plugins"
 
 _zplugin_load() {
   local plugin_path="${ZPLUGINDIR}/${2}"
-  if [[ ! -d "$plugin_path" ]]; then
+  # Guard on the plugin FILE, not the dir: archive-based installs (Mend workspaces) materialize
+  # the submodule as an empty directory, which must still trigger the clone.
+  if [[ ! -f "${plugin_path}/${2}.plugin.zsh" ]]; then
+    rm -rf "$plugin_path"
     mkdir -p "$ZPLUGINDIR"
     echo "Installing ${2}..."
     git clone --depth=1 "https://github.com/${1}/${2}" "$plugin_path" \

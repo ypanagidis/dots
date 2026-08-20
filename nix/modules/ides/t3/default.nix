@@ -2,10 +2,10 @@
 
 lib.mkIf pkgs.stdenv.hostPlatform.isLinux (
   let
-    version = "0.0.25-nightly.20260515.295";
+    version = "0.0.34-nightly.20260819.1133";
     src = pkgs.fetchurl {
       url = "https://github.com/pingdotgg/t3code/releases/download/v${version}/T3-Code-${version}-x86_64.AppImage";
-      hash = "sha256-aQqcSekj+hyShxwOWLRLa+NbH50pBWlkNBRL4IstksQ=";
+      hash = "sha256-kWg8I3CVWKROnIozOPK40crIAAhBCA2wjmaLCLR+DF4=";
     };
 
     t3Package = pkgs.callPackage ./t3.nix {

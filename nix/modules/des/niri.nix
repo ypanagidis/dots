@@ -155,6 +155,9 @@ in
   xdg.configFile."niri-ctx/config.toml".text = ''
     [behavior]
     bash_fallback = "${niriCtx}/libexec/niri-ctx/bash-fallback"
+
+    [terminal]
+    program = "alacritty"
   '';
 
   # Keep the v5 bar edge-to-edge, matching the previous shell. The clock sits

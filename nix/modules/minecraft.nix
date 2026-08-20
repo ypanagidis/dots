@@ -44,19 +44,16 @@ in
 
       DEFAULT_INSTANCE="''${MC_PRISM_INSTANCE:-fabric}"
       PRISM_DIR="''${MC_PRISM_DIR:-$HOME/.local/share/PrismLauncher}"
-      KSCREEN_DOCTOR_BIN="''${KSCREEN_DOCTOR_BIN:-$(command -v kscreen-doctor || true)}"
+      NIRI_BIN="''${MC_PRISM_NIRI:-$(command -v niri || true)}"
       PRISM_LAUNCHER="''${MC_PRISM_LAUNCHER:-${prismLauncher}/bin/prismlauncher}"
       JQ_BIN="''${MC_PRISM_JQ:-${pkgs.jq}/bin/jq}"
 
       PLAY_WIDTH=3840
       PLAY_HEIGHT=2160
       PLAY_SCALE=1.75
-      RESTORE_WIDTH=5120
-      RESTORE_HEIGHT=2880
-      RESTORE_SCALE=2
 
-      if [ -z "$KSCREEN_DOCTOR_BIN" ]; then
-        echo "kscreen-doctor not found in PATH" >&2
+      if [ -z "$NIRI_BIN" ]; then
+        echo "niri not found in PATH" >&2
         exit 1
       fi
 
@@ -65,7 +62,7 @@ in
         exit 1
       fi
 
-      SCREEN_JSON="$($KSCREEN_DOCTOR_BIN -j)"
+      SCREEN_JSON="$("$NIRI_BIN" msg --json outputs)"
 
       if [ "$#" -gt 0 ] && [ "''${1#-}" != "$1" ]; then
         LAUNCH_ARGS=("$@")
@@ -107,11 +104,11 @@ in
 
       detect_output() {
         printf '%s' "$SCREEN_JSON" | "$JQ_BIN" -r '
-          [
-            .outputs[]
-            | select(.connected == true)
-            | select(any(.modes[]?; .size.width == 5120 and .size.height == 2880))
-          ][0].name // empty
+          to_entries
+          | [
+              .[]
+              | select(any(.value.modes[]?; .width == 5120 and .height == 2880))
+            ][0].key // empty
         '
       }
 
@@ -122,41 +119,34 @@ in
 
         printf '%s' "$SCREEN_JSON" | "$JQ_BIN" -r \
           --arg out "$output_name" --argjson w "$target_width" --argjson h "$target_height" '
-            .outputs[]
-            | select(.name == $out)
-            | [.modes[] | select(.size.width == $w and .size.height == $h) | .name][0] // empty
+            .[$out].modes
+            | map(select(.width == $w and .height == $h))
+            | (max_by(.refresh_rate) // empty)
+            | "\(.width)x\(.height)@\(.refresh_rate / 1000)"
           '
       }
 
-      OUTPUT_NAME="$(detect_output)"
+      OUTPUT_NAME="''${MC_PRISM_OUTPUT:-$(detect_output)}"
 
       if [ -z "$OUTPUT_NAME" ] || [ "$OUTPUT_NAME" = "null" ]; then
-        OUTPUT_NAME="$(printf '%s' "$SCREEN_JSON" | "$JQ_BIN" -r '
-          [
-            .outputs[]
-            | select(.connected == true)
-            | {name: .name, area: (.size.width * .size.height)
-          }
-          ]
-            | sort_by(.area)
-            | reverse
-            | .[0].name // empty')"
-
-        if [ -z "$OUTPUT_NAME" ] || [ "$OUTPUT_NAME" = "null" ]; then
-          echo "No connected output found." >&2
-          exit 1
-        fi
+        echo "Could not find the 5K Minecraft output. Set MC_PRISM_OUTPUT to its connector name." >&2
+        exit 1
       fi
 
       PLAY_MODE="$(detect_mode "$OUTPUT_NAME" "$PLAY_WIDTH" "$PLAY_HEIGHT")"
-      RESTORE_MODE="$(detect_mode "$OUTPUT_NAME" "$RESTORE_WIDTH" "$RESTORE_HEIGHT")"
+      RESTORE_MODE="$(printf '%s' "$SCREEN_JSON" | "$JQ_BIN" -r --arg out "$OUTPUT_NAME" '
+        .[$out] as $output
+        | ($output.modes[$output.current_mode] // empty)
+        | "\(.width)x\(.height)@\(.refresh_rate / 1000)"
+      ')"
+      RESTORE_SCALE="$(printf '%s' "$SCREEN_JSON" | "$JQ_BIN" -r --arg out "$OUTPUT_NAME" '.[$out].logical.scale // empty')"
 
       if [ -z "$PLAY_MODE" ] || [ "$PLAY_MODE" = "null" ]; then
         echo "Could not find $PLAY_WIDTHx$PLAY_HEIGHT mode for $OUTPUT_NAME" >&2
         exit 1
       fi
-      if [ -z "$RESTORE_MODE" ] || [ "$RESTORE_MODE" = "null" ]; then
-        echo "Could not find $RESTORE_WIDTHx$RESTORE_HEIGHT mode for $OUTPUT_NAME" >&2
+      if [ -z "$RESTORE_MODE" ] || [ "$RESTORE_MODE" = "null" ] || [ -z "$RESTORE_SCALE" ]; then
+        echo "Could not read the current mode and scale for $OUTPUT_NAME" >&2
         exit 1
       fi
 
@@ -170,11 +160,12 @@ in
         local mode="$1"
         local scale="$2"
 
-        if "$KSCREEN_DOCTOR_BIN" "output.$OUTPUT_NAME.mode.$mode" "output.$OUTPUT_NAME.scale.$scale" >/dev/null; then
+        if "$NIRI_BIN" msg output "$OUTPUT_NAME" mode "$mode" >/dev/null \
+          && "$NIRI_BIN" msg output "$OUTPUT_NAME" scale "$scale" >/dev/null; then
           return
         fi
 
-        echo "Failed to apply output.$OUTPUT_NAME.mode.$mode scale.$scale" >&2
+        echo "Failed to apply $mode at scale $scale to $OUTPUT_NAME" >&2
         return 1
       }
 
@@ -183,6 +174,7 @@ in
           return
         fi
 
+        RESTORE_PENDING=0
         if ! apply_display "$RESTORE_MODE" "$RESTORE_SCALE"; then
           echo "Could not restore display. Manual restore may be needed." >&2
         fi
@@ -190,12 +182,11 @@ in
 
       trap restore_display EXIT INT TERM
 
+      RESTORE_PENDING=1
       if ! apply_display "$PLAY_MODE" "$PLAY_SCALE"; then
-        echo "Failed to apply $PLAY_WIDTH x $PLAY_HEIGHT at $PLAY_SCALE. Restore skipped." >&2
+        echo "Failed to apply $PLAY_WIDTH x $PLAY_HEIGHT at $PLAY_SCALE." >&2
         exit 1
       fi
-
-      RESTORE_PENDING=1
 
       LAUNCH_STATUS=0
       if command -v gamemoderun >/dev/null 2>&1; then

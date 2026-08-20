@@ -44,7 +44,7 @@ nixos-install --flake .#nixos
 - Restore the backup: `tar -I zstd -xf backup-yiannis-2026-08-15.tar.zst -C ~`
   (brings back `Developer/`, `.ssh`, `.codex`, `.claude`). Restore AFTER the
   clone check — the tarball's `Developer/Configs` may be older than the repo.
-- ghostty/tmux/nvim configs are symlinked from `dots/` by their nix modules
+- terminal/tmux/nvim configs are symlinked from `dots/` by their nix modules
   (packages and language tooling stay declarative in nix); zsh/btop remain
   nix-native for now (see `modules/dots.nix` header).
 
