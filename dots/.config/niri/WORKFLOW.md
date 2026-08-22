@@ -40,12 +40,11 @@ back-and-forth.
 
 ## Workspaces
 
-`DP-1`: `scratch`, `Webroot`, `UP`, `Sealant`, `Side`, `Admin`
-`DP-2`: `top-ambient`, `UP-devtools`, `Webroot-devtools`, `Sealant-devtools`, `Side-devtools`
+`DP-1`: `scratch`, `Webroot`, `UP`, `Sealant`
+`DP-2`: `top-ambient`, `UP-devtools`, `Webroot-devtools`, `Sealant-devtools`
 `HDMI-A-1`: `comms`
 
-`Admin` deliberately has no devtools workspace. `scratch` is a pseudo-context:
-helium plus a plain terminal, no herdr session.
+`scratch` is a pseudo-context: helium plus a plain terminal, no herdr session.
 
 ## Hotkeys
 
@@ -55,8 +54,6 @@ Hyper on this keyboard emits `CTRL+ALT+Shift+Super`.
 - `Hyper+2`: `niri-ctx open Webroot`
 - `Hyper+3`: `niri-ctx open UP`
 - `Hyper+4`: `niri-ctx open Sealant`
-- `Hyper+5`: `niri-ctx open Side`
-- `Hyper+6`: `niri-ctx open Admin`
 - `Hyper+A`: `niri-ctx open current docs`
 - `Hyper+G`: `niri-ctx open current editor`
 - `Hyper+C`: `niri-ctx open current agents`
@@ -68,6 +65,7 @@ Hyper on this keyboard emits `CTRL+ALT+Shift+Super`.
 - `Hyper+Left/Right` (`H`/`L`): focus previous/next card.
 - `Hyper+Up/Down` (`K`/`J`): focus workspace above/below.
 - `Hyper+[` / `Hyper+]`: focus monitor left/right; `Hyper+Page_Up/Down` up/down.
+- `Mod+Shift+H/J/K/L`: move the focused column to the monitor left/down/up/right.
 
 Layout controls on `Mod`: `Mod+Ctrl+R` preset widths, `Mod+Ctrl+M` maximize
 column, `Mod+M` maximize to edges, `Mod+Shift+M` fullscreen, `Mod+W` tabbed

@@ -67,6 +67,10 @@ binds {
     Mod+Shift+CTRL+Right                { move-column-to-monitor-right; }
     Mod+Shift+CTRL+UP                   { move-column-to-monitor-up; }
     Mod+Shift+CTRL+Down                 { move-column-to-monitor-down; }
+    Mod+Shift+H                         { move-column-to-monitor-left; }
+    Mod+Shift+L                         { move-column-to-monitor-right; }
+    Mod+Shift+K                         { move-column-to-monitor-up; }
+    Mod+Shift+J                         { move-column-to-monitor-down; }
 
     // ─── Workspace Switching ───
     Mod+WheelScrollDown                 cooldown-ms=150 { focus-workspace-down; }
@@ -88,22 +92,11 @@ binds {
     CTRL+ALT+Shift+Super+2              hotkey-overlay-title="Open Context: Webroot" repeat=false { spawn "niri-ctx" "open" "Webroot"; }
     CTRL+ALT+Shift+Super+3              hotkey-overlay-title="Open Context: UP" repeat=false { spawn "niri-ctx" "open" "UP"; }
     CTRL+ALT+Shift+Super+4              hotkey-overlay-title="Open Context: Sealant" repeat=false { spawn "niri-ctx" "open" "Sealant"; }
-    CTRL+ALT+Shift+Super+5              hotkey-overlay-title="Open Context: Side" repeat=false { spawn "niri-ctx" "open" "Side"; }
-    CTRL+ALT+Shift+Super+6              hotkey-overlay-title="Open Context: Admin" repeat=false { spawn "niri-ctx" "open" "Admin"; }
-    Mod+6                               { focus-workspace 6; }
-    Mod+7                               { focus-workspace 7; }
-    Mod+8                               { focus-workspace 8; }
-    Mod+9                               { focus-workspace 9; }
 
     Mod+CTRL+1                          { move-column-to-workspace "scratch"; }
     Mod+CTRL+2                          { move-column-to-workspace "Webroot"; }
     Mod+CTRL+3                          { move-column-to-workspace "UP"; }
     Mod+CTRL+4                          { move-column-to-workspace "Sealant"; }
-    Mod+CTRL+5                          { move-column-to-workspace "Side"; }
-    Mod+CTRL+6                          { move-column-to-workspace "Admin"; }
-    Mod+CTRL+7                          { move-column-to-workspace 7; }
-    Mod+CTRL+8                          { move-column-to-workspace 8; }
-    Mod+CTRL+9                          { move-column-to-workspace 9; }
 
     Mod+TAB                             { focus-workspace-previous; }
 

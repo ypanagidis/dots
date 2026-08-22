@@ -1,5 +1,6 @@
 {
   config,
+  inputs,
   pkgs,
   lib,
   ...
@@ -38,6 +39,7 @@ in
       haruna
       bruno
       obsidian
+      inputs.opencode-flake.packages.${pkgs.stdenv.hostPlatform.system}.opencode-desktop
     ]
   );
 

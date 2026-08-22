@@ -40,6 +40,7 @@ in
     llmAgents.codex
     llmAgents.opencode
     llmAgents.gemini-cli
+    llmAgents.orca
   ];
 
   xdg.configFile."opencode/opencode.json".text = builtins.toJSON {

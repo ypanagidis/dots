@@ -33,10 +33,9 @@ let
     defaultProvider = "openai-codex";
     defaultModel = "gpt-5.6-sol";
     enableSkillCommands = true;
-    "pi-codex-fast".mode = "fast";
     packages = [
       "npm:@plannotator/pi-extension@0.27.3"
-      "npm:@calesennett/pi-codex-fast@0.1.6"
+      "npm:@narumitw/pi-usage@0.52.1"
       {
         source = "npm:pi-lens@4.0.1";
         extensions = [ ];
@@ -151,6 +150,7 @@ in
         . as $baseline
         | ($current[0] // {}) as $runtime
         | ($baseline * $runtime)
+        | del(."pi-codex-fast")
         | .packages = $baseline.packages
       ' "$baseline" > "$temp"
     else

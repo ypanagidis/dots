@@ -66,16 +66,6 @@
         open-on-workspace "Sealant"
     }
 
-    window-rule {
-        match app-id=r#"^dev\.yiannis\.niri\.side\.(work|editor|agents|logs|term)$"#
-        open-on-workspace "Side"
-    }
-
-    window-rule {
-        match app-id=r#"^dev\.yiannis\.niri\.admin\.(work|editor|agents|logs|term)$"#
-        open-on-workspace "Admin"
-    }
-
      // if you use steam you will probably like these
     window-rule {
         match app-id=r#"^steam$"#

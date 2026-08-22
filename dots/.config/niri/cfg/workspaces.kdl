@@ -18,14 +18,6 @@ workspace "Sealant" {
     open-on-output "DP-1"
 }
 
-workspace "Side" {
-    open-on-output "DP-1"
-}
-
-workspace "Admin" {
-    open-on-output "DP-1"
-}
-
 workspace "top-ambient" {
     open-on-output "DP-2"
 }
@@ -39,10 +31,6 @@ workspace "Webroot-devtools" {
 }
 
 workspace "Sealant-devtools" {
-    open-on-output "DP-2"
-}
-
-workspace "Side-devtools" {
     open-on-output "DP-2"
 }
 

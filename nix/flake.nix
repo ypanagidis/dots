@@ -17,6 +17,10 @@
     # deliberately NOT following our nixpkgs so numtide's binary cache hits.
     llm-agents.url = "github:numtide/llm-agents.nix";
 
+    # Official OpenCode flake, kept separately because llm-agents packages the
+    # CLI but not the desktop app.
+    opencode-flake.url = "github:anomalyco/opencode";
+
     # Declarative partitioning; disk-config.nix replaces the filesystem half
     # of hardware-configuration.nix.
     disko = {
