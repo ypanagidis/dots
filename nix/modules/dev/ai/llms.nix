@@ -32,6 +32,22 @@ let
   # All AI coding agents come from the llm-agents flake (numtide binary
   # cache, 160+ packages). Add more by extending this list.
   llmAgents = inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system};
+
+  plannotator = llmAgents.plannotator;
+  plannotatorClaudeHook = pkgs.writeText "claude-plannotator-hook.json" (
+    builtins.toJSON [
+      {
+        matcher = "ExitPlanMode";
+        hooks = [
+          {
+            type = "command";
+            command = "${plannotator}/bin/plannotator";
+            timeout = 345600;
+          }
+        ];
+      }
+    ]
+  );
 in
 
 {
@@ -41,6 +57,7 @@ in
     llmAgents.opencode
     llmAgents.gemini-cli
     llmAgents.orca
+    plannotator
   ];
 
   xdg.configFile."opencode/opencode.json".text = builtins.toJSON {
@@ -81,4 +98,38 @@ in
       fi
     '') legacySkillPaths
   );
+
+  # Claude Code and Orca both update settings.json at runtime. Keep it writable,
+  # preserve their settings, and replace only the hook owned by this module.
+  home.activation.installClaudePlannotatorHook = config.lib.dag.entryAfter [ "linkGeneration" ] ''
+    settingsDir=${lib.escapeShellArg "${home}/.claude"}
+    settingsFile="$settingsDir/settings.json"
+    managedHook=${lib.escapeShellArg plannotatorClaudeHook}
+
+    mkdir -p "$settingsDir"
+    temp="$(${pkgs.coreutils}/bin/mktemp "$settingsDir/.settings.json.XXXXXX")"
+    trap '${pkgs.coreutils}/bin/rm -f "$temp"' EXIT
+
+    if [ -e "$settingsFile" ] \
+      && ${pkgs.jq}/bin/jq -e 'type == "object"' "$settingsFile" >/dev/null 2>&1
+    then
+      ${pkgs.jq}/bin/jq --slurpfile managed "$managedHook" '
+        .hooks = (.hooks // {})
+        | .hooks.PermissionRequest = (
+            ((.hooks.PermissionRequest // [])
+              | map(select(.matcher != "ExitPlanMode")))
+            + $managed[0]
+          )
+      ' "$settingsFile" > "$temp"
+    else
+      ${pkgs.jq}/bin/jq -n --slurpfile managed "$managedHook" '
+        { hooks: { PermissionRequest: $managed[0] } }
+      ' > "$temp"
+    fi
+
+    ${pkgs.coreutils}/bin/chmod 0600 "$temp"
+    ${pkgs.coreutils}/bin/rm -f "$settingsFile"
+    ${pkgs.coreutils}/bin/mv "$temp" "$settingsFile"
+    trap - EXIT
+  '';
 }

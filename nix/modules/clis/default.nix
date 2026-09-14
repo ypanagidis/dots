@@ -1,5 +1,14 @@
 { pkgs, ... }:
 
+let
+  # nixpkgs' minikube package also exposes a `kubectl` shim. Remove it so the
+  # real kubectl package can provide that command without a buildEnv collision.
+  minikubeOnly = pkgs.minikube.overrideAttrs (old: {
+    postInstall = (old.postInstall or "") + ''
+      rm "$out/bin/kubectl"
+    '';
+  });
+in
 {
   imports = [
     ./tmux.nix
@@ -51,7 +60,15 @@
 
   # User-facing CLI tools that are not provided by a richer HM program module.
   home.packages = with pkgs; [
+    bootdev-cli
+    kubectl
+    kubernetes-helm
+    minikubeOnly
     doppler
+    # Secrets-at-rest for the Talos/infra repo: sops encrypts values in place,
+    # age is its keypair backend (~/.config/sops/age/keys.txt).
+    sops
+    age
     fastfetch
     # Clipboard CLI — also what Claude Code and other TUIs use to read/write
     # image clipboard content under Wayland.

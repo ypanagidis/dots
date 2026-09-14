@@ -11,8 +11,6 @@ rustPlatform.buildRustPackage {
 
   src = lib.cleanSource src;
 
-  patches = [ ./niri-ctx-current-exe.patch ];
-
   cargoLock.lockFile = src + "/Cargo.lock";
 
   postInstall = ''

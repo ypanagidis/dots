@@ -1,0 +1,224 @@
+" IdeaVim config, ported from dots/.config/nvim.
+" Reload inside the IDE with :source ~/.config/ideavim/ideavimrc
+"
+" Ctrl+J / Ctrl+K inside popups (Search Everywhere, completion, Find in
+" Files, tool-window lists) are NOT controlled from here: IdeaVim never sees
+" keys while a popup has focus. They live in the IntelliJ keymap
+" dots/.config/JetBrains/keymaps/Neovim.xml, which rebinds the IDE's own
+" "Down"/"Up" actions. Select that keymap once in Settings > Keymap.
+
+let mapleader = " "
+
+" ---------------------------------------------------------------- options
+set number
+set relativenumber
+set ignorecase
+set smartcase
+set incsearch
+set hlsearch
+set scrolloff=8
+set sidescrolloff=8
+set timeoutlen=500
+set clipboard=unnamedplus,ideaput
+set visualbell
+
+" IDE integration
+set ideajoin                 " J uses the IDE's smart join
+set idearefactormode=keep    " stay in the mode you were in during refactors
+set ideastatusicon=gray
+
+" ---------------------------------------------------------------- plugins
+set surround                 " ys / ds / cs (mini.surround aliases below)
+set commentary               " gcc / gc{motion}
+set highlightedyank
+set argtextobj               " ia / aa
+set textobj-entire           " ie / ae
+set matchit
+" Needs the separate "Which-Key" IDE plugin (Settings > Plugins).
+set which-key
+set notimeout
+
+" Bracket / quote text objects work natively. mini.surround uses gs* instead
+" of the vim-surround defaults, so alias those onto IdeaVim's <Plug> targets.
+nmap gsa <Plug>YSurround
+nmap gsd <Plug>DSurround
+nmap gsr <Plug>CSurround
+xmap gsa <Plug>VSurround
+
+" ---------------------------------------------------------------- handlers
+" Which side (Vim or IDE) owns a Ctrl chord, per mode. n = normal, v = visual,
+" i = insert, a = all. Anything unlisted prompts once in the IDE.
+sethandler <C-h> a:vim
+sethandler <C-l> a:vim
+sethandler <C-j> n-v:vim i:ide
+sethandler <C-k> n-v:vim i:ide
+sethandler <C-d> a:vim
+sethandler <C-u> a:vim
+sethandler <C-o> a:vim
+sethandler <C-i> a:vim
+sethandler <C-r> a:vim
+sethandler <C-v> a:vim
+sethandler <C-w> a:vim
+sethandler <C-e> a:vim
+sethandler <C-y> a:vim
+sethandler <C-f> a:vim
+sethandler <C-b> a:vim
+sethandler <C-a> a:vim
+sethandler <C-x> a:vim
+sethandler <C-n> a:vim
+sethandler <C-p> a:vim
+sethandler <C-c> a:vim
+sethandler <C-s> a:ide
+sethandler <C-z> a:ide
+sethandler <C-Space> a:ide
+sethandler <C-Up> a:vim
+sethandler <C-Down> a:vim
+sethandler <C-Left> a:vim
+sethandler <C-Right> a:vim
+
+" ---------------------------------------------------------------- core (keymaps.lua)
+inoremap jk <Esc>
+nnoremap <Esc> :nohlsearch<CR>
+
+" Window navigation (tmux-navigator in nvim; plain split navigation here)
+nnoremap <C-h> <C-w>h
+nnoremap <C-j> <C-w>j
+nnoremap <C-k> <C-w>k
+nnoremap <C-l> <C-w>l
+
+" Resize splits
+nmap <C-Up>    <Action>(StretchSplitToTop)
+nmap <C-Down>  <Action>(StretchSplitToBottom)
+nmap <C-Left>  <Action>(StretchSplitToLeft)
+nmap <C-Right> <Action>(StretchSplitToRight)
+
+" Move lines
+vmap J <Action>(MoveLineDown)
+vmap K <Action>(MoveLineUp)
+
+" Better indenting
+vnoremap < <gv
+vnoremap > >gv
+
+" Keep cursor centered
+nnoremap <C-d> <C-d>zz
+nnoremap <C-u> <C-u>zz
+nnoremap n nzzzv
+nnoremap N Nzzzv
+
+" Buffers (editor tabs)
+nmap <leader>bd <Action>(CloseContent)
+nmap <S-h>      <Action>(PreviousTab)
+nmap <S-l>      <Action>(NextTab)
+nmap [b         <Action>(PreviousTab)
+nmap ]b         <Action>(NextTab)
+nmap <leader>bo <Action>(CloseAllEditorsButActive)
+nmap <leader>bl <Action>(CloseAllToTheRight)
+nmap <leader>bh <Action>(CloseAllToTheLeft)
+nmap <leader>bp <Action>(PinActiveEditorTab)
+nmap <leader>bP <Action>(CloseAllUnpinnedEditors)
+nmap <leader>bs <Action>(Switcher)
+
+" Quickfix (Find / Usages / Problems results)
+nmap <leader>qn <Action>(NextOccurence)
+nmap <leader>qp <Action>(PreviousOccurence)
+nmap <leader>qc <Action>(HideActiveWindow)
+nmap <leader>qq <Action>(Exit)
+
+" Windows (splits)
+nmap <leader>wv <Action>(SplitVertically)
+nmap <leader>wh <Action>(SplitHorizontally)
+nmap <leader>wd <Action>(Unsplit)
+nmap <leader>wo <Action>(UnsplitAll)
+nmap <leader>wm <Action>(HideAllWindows)
+
+" ---------------------------------------------------------------- find / pickers (snacks.lua)
+nmap <leader>ff <Action>(GotoFile)
+nmap <leader>fg <Action>(FindInPath)
+nmap <leader>fw <Action>(FindInPath)
+nmap <leader>fb <Action>(RecentFiles)
+nmap <leader>fr <Action>(RecentChangedFiles)
+nmap <leader>fs <Action>(FileStructurePopup)
+nmap <leader>fS <Action>(GotoSymbol)
+nmap <leader>fd <Action>(ActivateProblemsViewToolWindow)
+nmap <leader>/  <Action>(Find)
+nmap <leader><leader> <Action>(SearchEverywhere)
+
+" Search
+nmap <leader>sh <Action>(HelpTopics)
+nmap <leader>sc <Action>(GotoAction)
+nmap <leader>sk :map<CR>
+nmap <leader>st <Action>(ActivateTODOToolWindow)
+nmap <leader>?  :map<CR>
+
+" ---------------------------------------------------------------- git
+nmap <leader>gc <Action>(Vcs.Show.Log)
+nmap <leader>gs <Action>(ActivateCommitToolWindow)
+nmap <leader>gb <Action>(Git.Branches)
+nmap <leader>gd <Action>(Compare.SameVersion)
+nmap <leader>G  <Action>(ActivateVersionControlToolWindow)
+nmap <leader>t  <Action>(ActivateTerminalToolWindow)
+
+" Git hunks (gitsigns.lua)
+nmap ]h <Action>(VcsShowNextChangeMarker)
+nmap [h <Action>(VcsShowPrevChangeMarker)
+nmap <leader>hr <Action>(Vcs.RollbackChangedLines)
+vmap <leader>hr <Action>(Vcs.RollbackChangedLines)
+nmap <leader>hp <Action>(VcsShowCurrentChangeMarker)
+nmap <leader>hb <Action>(Annotate)
+nmap <leader>hd <Action>(Compare.SameVersion)
+nmap <leader>hD <Action>(Compare.LastVersion)
+nmap <leader>hS <Action>(Git.Add)
+nmap <leader>hR <Action>(ChangesView.Revert)
+
+" ---------------------------------------------------------------- file explorer (oil / yazi)
+nmap -         <Action>(SelectInProjectView)
+nmap <leader>e <Action>(ActivateProjectToolWindow)
+nmap <leader>y <Action>(RevealIn)
+
+" ---------------------------------------------------------------- LSP (lsp.lua)
+nmap gd <Action>(GotoDeclaration)
+nmap gD <Action>(GotoDeclaration)
+nmap gy <Action>(GotoTypeDeclaration)
+nmap gi <Action>(ShowUsages)
+nmap gI <Action>(GotoImplementation)
+nmap gr <Action>(ShowUsages)
+nmap K  <Action>(QuickJavaDoc)
+nmap <leader>k  <Action>(ParameterInfo)
+nmap <leader>cr <Action>(RenameElement)
+nmap <leader>ca <Action>(ShowIntentionActions)
+vmap <leader>ca <Action>(ShowIntentionActions)
+nmap <leader>cf <Action>(ReformatCode)
+vmap <leader>cf <Action>(ReformatCode)
+nmap <leader>cd <Action>(ShowErrorDescription)
+nmap [d <Action>(GotoPreviousError)
+nmap ]d <Action>(GotoNextError)
+
+" Diagnostics / lists (trouble.lua)
+nmap <leader>xx <Action>(ActivateProblemsViewToolWindow)
+nmap <leader>xX <Action>(ActivateProblemsViewToolWindow)
+nmap <leader>xs <Action>(ActivateStructureToolWindow)
+nmap <leader>xr <Action>(FindUsages)
+nmap <leader>xq <Action>(ActivateFindToolWindow)
+nmap <leader>xt <Action>(ActivateTODOToolWindow)
+
+" ---------------------------------------------------------------- debug (dap.lua)
+nmap <leader>db <Action>(ToggleLineBreakpoint)
+nmap <leader>dd <Action>(Debug)
+nmap <leader>dc <Action>(Resume)
+nmap <leader>di <Action>(StepInto)
+nmap <leader>do <Action>(StepOver)
+nmap <leader>dO <Action>(StepOut)
+nmap <leader>dr <Action>(EvaluateExpression)
+nmap <leader>du <Action>(ActivateDebugToolWindow)
+nmap <leader>dx <Action>(Stop)
+
+" ---------------------------------------------------------------- ui toggles
+nmap <leader>ur :nohlsearch<CR>
+nmap <leader>uw <Action>(EditorToggleUseSoftWraps)
+nmap <leader>ul <Action>(EditorToggleShowLineNumbers)
+nmap <leader>uL :set relativenumber!<CR>
+nmap <leader>uh <Action>(ToggleInlayHintsGloballyAction)
+nmap <leader>uZ <Action>(ToggleZenMode)
+nmap <leader>uD <Action>(ToggleDistractionFreeMode)
+nmap <leader>un <Action>(ClearAllNotifications)

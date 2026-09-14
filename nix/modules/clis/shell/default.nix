@@ -69,7 +69,7 @@ in
       # Shared config fragments from dots/ (fzf keybindings themselves come
       # from programs.fzf's zsh integration; prompt comes from starship above;
       # plugins.zsh is intentionally not sourced — nix provides the plugins).
-      for _f in fzf aliases bindings node; do
+      for _f in fzf aliases bindings node k8s; do
         source "${config.xdg.configHome}/zsh/''${_f}.zsh"
       done
       unset _f

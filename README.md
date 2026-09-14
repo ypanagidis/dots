@@ -129,7 +129,7 @@ Home Manager exposes the same editable tree at:
 ~/.claude/skills   # Claude Code
 ```
 
-There is one source of truth. Skill edits do not require a rebuild. The selection rationale and integration notes are documented in [`docs/pi-skills.md`](docs/pi-skills.md).
+There is one source of truth. Skill edits do not require a rebuild. The tree includes Claude's `/plannotator-review`, `/plannotator-annotate`, and `/plannotator-last` commands. The selection rationale and integration notes are documented in [`docs/pi-skills.md`](docs/pi-skills.md).
 
 ### Pi runtime
 

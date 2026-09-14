@@ -7,12 +7,28 @@ local function get_ts_root(bufnr)
 	return vim.fs.root(filename, ts_root_markers)
 end
 
-local function has_local_tsgo(root)
-	return root and vim.uv.fs_stat(root .. "/node_modules/.bin/tsgo") ~= nil
+local function local_tsgo(root)
+	if not root then
+		return nil
+	end
+	local bin = root .. "/node_modules/.bin/tsgo"
+	return vim.fn.executable(bin) == 1 and bin or nil
 end
 
--- Configure tsgo with more memory
-vim.lsp.config("tsgo", {
+local function has_local_tsgo(root)
+	return local_tsgo(root) ~= nil
+end
+
+-- tsgo (TypeScript 7 native LSP). nvim-lspconfig ships this as `tsc` (the old
+-- `tsgo` name is deprecated). Its default cmd prefers a binary called `tsc`,
+-- which in most projects is TypeScript 5's tsc and rejects `--lsp`, so the
+-- server exits immediately. Always launch tsgo: the project-local one when
+-- present, otherwise the one on PATH.
+vim.lsp.config("tsc", {
+	cmd = function(dispatchers, config)
+		local bin = local_tsgo(config and config.root_dir) or "tsgo"
+		return vim.lsp.rpc.start({ bin, "--lsp", "--stdio" }, dispatchers)
+	end,
 	root_dir = function(bufnr, on_dir)
 		local root = get_ts_root(bufnr)
 		if has_local_tsgo(root) then
@@ -96,7 +112,7 @@ vim.lsp.config("clangd", {
 
 -- Enable servers (configs come from nvim-lspconfig)
 vim.lsp.enable({
-	"tsgo",
+	"tsc",
 	"ts_ls",
 	"oxlint",
 	"gopls",

@@ -18,6 +18,21 @@ let
     derivationArgs.npmFlags = [ "--legacy-peer-deps" ];
   };
 
+  # Upstream 0.60.3 predates Astra and rejects /fast for gpt-6-astra even
+  # though Codex advertises its priority tier. Keep this patch beside the pin
+  # until @narumitw/pi-usage includes Astra itself.
+  piUsage = pkgs.runCommand "pi-usage-0.60.3-astra" { } ''
+    cp -R ${piNodeModules}/node_modules/@narumitw/pi-usage "$out"
+    chmod -R u+w "$out"
+
+    substituteInPlace "$out/src/codex-fast.ts" \
+      --replace-fail $'\t"gpt-5.4",' $'\t"gpt-6-astra",\n\t"gpt-5.4",'
+    substituteInPlace "$out/dist/index.ts" \
+      --replace-fail $'  "gpt-5.4",' $'  "gpt-6-astra",\n  "gpt-5.4",'
+
+    ln -s ${piNodeModules}/node_modules "$out/node_modules"
+  '';
+
   piRuntime = pkgs.runCommand "yiannis-pi-runtime" { } ''
     mkdir -p "$out"
     cp -R ${./extensions} "$out/extensions"
@@ -35,7 +50,8 @@ let
     enableSkillCommands = true;
     packages = [
       "npm:@plannotator/pi-extension@0.27.3"
-      "npm:@narumitw/pi-usage@0.52.1"
+      piUsage
+      "npm:pi-atomic-images@0.2.0"
       {
         source = "npm:pi-lens@4.0.1";
         extensions = [ ];

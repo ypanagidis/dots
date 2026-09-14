@@ -1,6 +1,7 @@
 {
   pkgs,
   inputs,
+  lib,
   ...
 }:
 
@@ -57,4 +58,20 @@
       };
     };
   };
+
+  # ~/.ssh/config must be a real file owned by the user, not a symlink into the
+  # Nix store. Tools that run inside a bubblewrap user namespace (FHS-wrapped
+  # binaries such as `gt`, sandboxes) see store files as owned by `nobody`, and
+  # OpenSSH then refuses the config with "Bad owner or permissions". Home
+  # Manager links the generated file first; this step replaces the link with a
+  # private copy. `force` lets the next generation overwrite that copy again.
+  home.file.".ssh/config".force = true;
+  home.activation.materializeSshConfig = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    if [ -L "$HOME/.ssh/config" ]; then
+      target="$(readlink -f "$HOME/.ssh/config")"
+      run rm -f "$HOME/.ssh/config"
+      run cp "$target" "$HOME/.ssh/config"
+      run chmod 600 "$HOME/.ssh/config"
+    fi
+  '';
 }

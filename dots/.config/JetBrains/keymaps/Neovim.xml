@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  IntelliJ keymap that complements dots/.config/ideavim/ideavimrc.
+  IdeaVim cannot see keys while a popup owns focus, so Ctrl+J / Ctrl+K list
+  navigation is bound here on the IDE's own "Down"/"Up" editor actions.
+  Every searchable list (Search Everywhere, Go to File, completion lookup,
+  Recent Files, Find in Files, Project tree) reads its move-down/move-up
+  shortcuts from those two actions.
+
+  A child keymap replaces an action's full shortcut list, so Down/Up are
+  restated to keep the arrow keys working.
+
+  Select it once: Settings > Keymap > "Neovim".
+-->
+<keymap version="1" name="Neovim" parent="$default">
+  <action id="EditorDown">
+    <keyboard-shortcut first-keystroke="DOWN" />
+    <keyboard-shortcut first-keystroke="ctrl J" />
+  </action>
+  <action id="EditorUp">
+    <keyboard-shortcut first-keystroke="UP" />
+    <keyboard-shortcut first-keystroke="ctrl K" />
+  </action>
+  <!-- Free Ctrl+J (Insert Live Template) and Ctrl+K (Commit) from their defaults. -->
+  <action id="InsertLiveTemplate" />
+  <action id="CheckinProject" />
+</keymap>

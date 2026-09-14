@@ -1,4 +1,4 @@
-{ pkgs, ... }:
+{ lib, pkgs, ... }:
 
 {
   # Keep this file as the host entrypoint. Package lists live in focused modules
@@ -54,7 +54,11 @@
   boot.kernelModules = [
     "k10temp"
     "asus_ec_sensors"
+    # Wispr Flow injects transcribed text through a virtual keyboard.
+    "uinput"
   ];
+
+  services.udev.packages = [ pkgs.wispr-flow ];
 
   boot.kernelParams = [
     # Prefer ACPI S3 suspend-to-RAM over the shallower s2idle mode.
@@ -66,8 +70,10 @@
   zramSwap.enable = true;
 
   networking.hostName = "nix-pc";
+  networking.extraHosts = ''
+    10.102.121.122 synchat.internal synchatapi.internal
+  '';
   networking.networkmanager.enable = true;
-  networking.firewall.trustedInterfaces = [ "virbr0" ];
   networking.firewall.allowedTCPPorts = [
     # Local dev / agent web UIs.
     4096
@@ -76,6 +82,30 @@
     # mend
     3105
   ];
+
+  # Tailscale: private network to the Hetzner box (`main`) and the other devices.
+  services.tailscale = {
+    enable = true;
+    useRoutingFeatures = "client";
+  };
+
+  # Accept SSH over trusted interfaces. `tailscale0` is trusted below, while
+  # port 22 stays closed on the public and LAN firewall. Password login remains
+  # available until the client key has been copied over.
+  services.openssh = {
+    enable = true;
+    openFirewall = false;
+    settings = {
+      PasswordAuthentication = true;
+      KbdInteractiveAuthentication = false;
+      PermitRootLogin = "no";
+      AllowUsers = [ "yiannis" ];
+    };
+  };
+
+  # Tailscale has no official Linux GUI; Trayscale is the usual GTK tray app.
+  environment.systemPackages = [ pkgs.trayscale ];
+  networking.firewall.trustedInterfaces = [ "virbr0" "tailscale0" ];
 
   time.timeZone = "Europe/Athens";
   i18n.defaultLocale = "en_US.UTF-8";
@@ -91,6 +121,8 @@
       "libvirtd"
       "kvm"
       "nordvpn"
+      # Fallback when logind does not grant the udev uaccess ACL.
+      "input"
     ];
   };
 
@@ -116,6 +148,9 @@
   # nordvpn-flake module is gone). CLI access is via the nordvpn group on the
   # user. Keep the daemon available so the CLI can connect on demand.
   services.nordvpn.enable = true;
+  # Don't launch the Nord tray/notifier at login; the daemon stays up so
+  # `nordvpn connect` still works on demand.
+  systemd.user.services.norduserd.wantedBy = lib.mkForce [ ];
 
   services.hardware.openrgb.enable = true;
   programs.coolercontrol.enable = true;

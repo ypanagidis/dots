@@ -17,9 +17,10 @@ out-of-store links, so editing a skill does not require a rebuild.
 These and the engineering/productivity skills below live under
 `~/.agents/skills` through Home Manager. Pi and Codex read that directory
 directly; Claude Code's `~/.claude/skills` is one Nix-managed symlink to the
-same tree. Executor and the Pi MCP adapter are runtime integration rather than
-additional workflow suites. The adapter's optional `mcp-scripting` skill is
-not installed.
+same tree. The tree includes the user-invoked `/plannotator-review`,
+`/plannotator-annotate`, and `/plannotator-last` commands. Executor and the Pi
+MCP adapter are runtime integration rather than additional workflow suites.
+The adapter's optional `mcp-scripting` skill is not installed.
 
 ## Executor bootstrap after rebuild
 
@@ -73,6 +74,11 @@ REST integration: the REST API does not provide the remote MCP server's full
   regressions. Establish a red-capable feedback loop before hypothesizing.
 - **writing-for-agents** — activate when writing or editing skills, workflows,
   `AGENTS.md`, `CLAUDE.md`, or documents reached through agent pointers.
+- **react-best-practices** — Vercel's React/Next.js performance rules
+  (waterfalls, bundle size, RSC, re-renders), copied by hand from
+  `vercel-labs/agent-skills` because the `skills.sh` installer is not used on
+  Nix. Activate when writing, reviewing, or refactoring React or Next.js code.
+  Refresh by re-copying `skills/react-best-practices` from upstream.
 
 `grilling` is also installed as the model-invoked primitive used by
 `grill-with-docs`; it is infrastructure rather than a separate everyday

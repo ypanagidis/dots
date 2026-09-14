@@ -39,6 +39,7 @@ in
       haruna
       bruno
       obsidian
+      wispr-flow
       inputs.opencode-flake.packages.${pkgs.stdenv.hostPlatform.system}.opencode-desktop
     ]
   );
