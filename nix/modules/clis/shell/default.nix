@@ -127,6 +127,18 @@ in
         cd "$original_dir"
       }
 
+      # Wispr Flow: bump the AppImage pin to the latest release and rebuild.
+      uw() {
+        local original_dir="$PWD"
+
+        if ${flakeDir}/custom-packages/update-wispr-flow.sh; then
+          echo "Rebuilding..."
+          cd ${flakeDir} && ${rebuild}
+        fi
+
+        cd "$original_dir"
+      }
+
       # Helium now comes from the helium-flake input (auto-bumped upstream);
       # update with: nix flake update helium-flake && rebuild
       uh() {

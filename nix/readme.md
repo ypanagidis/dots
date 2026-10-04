@@ -37,6 +37,7 @@ sudo nixos-rebuild switch --flake .#nixos
   gemini-cli), then rebuild.
 - `uh`: update the `helium-flake` input, then rebuild.
 - `uc <version>`: bump the Cursor AppImage pin, then rebuild.
+- `uw`: bump Wispr Flow to the latest wispr-flow-linux release, then rebuild.
 
 T3 Code updates itself from its nightly feed, as on macOS. The pin in
 `modules/ides/t3/default.nix` only seeds a fresh install.

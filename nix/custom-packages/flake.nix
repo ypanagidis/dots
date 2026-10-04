@@ -23,10 +23,13 @@
         let
           system = prev.stdenv.hostPlatform.system;
 
-          wisprFlowVersion = "1.6.7-1.0.3";
+          # Release tags are v<port>+wispr<app>; bump with update-wispr-flow.sh.
+          wisprAppVersion = "1.6.957";
+          wisprPortVersion = "1.0.4";
+          wisprFlowVersion = "${wisprAppVersion}-${wisprPortVersion}";
           wisprFlowSrc = final.fetchurl {
-            url = "https://github.com/wispr-flow-linux/wispr-flow-linux/releases/download/v1.0.3%2Bwispr1.6.7/wispr-flow-${wisprFlowVersion}-x86_64.AppImage";
-            hash = "sha256-T9/evAykYnc20TVc7sX3Bwf8aTkTkxEtDr8FNavIMfA=";
+            url = "https://github.com/wispr-flow-linux/wispr-flow-linux/releases/download/v${wisprPortVersion}%2Bwispr${wisprAppVersion}/wispr-flow-${wisprFlowVersion}-x86_64.AppImage";
+            hash = "sha256-2jeeMDWVnkadE5lyjwb1ThKplYoxp5P/GgZ39OEtiMU=";
           };
           wisprFlowContents = final.appimageTools.extract {
             pname = "wispr-flow";
