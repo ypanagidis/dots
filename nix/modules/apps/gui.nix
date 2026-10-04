@@ -18,6 +18,23 @@ let
       };
     });
   };
+
+  # Keep CLI, niri-ctx and desktop launches on the same backend. A desktop
+  # entry alone does not protect bare `discord` launches from NIXOS_OZONE_WL.
+  discordLauncher = pkgs.writeShellScriptBin "discord" ''
+    unset NIXOS_OZONE_WL
+    # Do not exec: the FHS sandbox uses --die-with-parent. Keep this shell
+    # alive when a short-lived launcher such as niri-ctx exits after splash.
+    # Under XWayland Electron picks scale 2 (the 5K output), so its 800 DIP
+    # min width becomes 1600 X px = 1066 logical on the 1.5-scale portrait
+    # comms output (960 wide). niri then widens the shared column past the
+    # screen and crops Slack/Telegram too. 1.5 is native for HDMI-A-1.
+    ${lib.getExe discordWithVulkan} --ozone-platform=x11 --force-device-scale-factor=1.5 "$@"
+  '';
+  discordDesktop = pkgs.symlinkJoin {
+    name = "discord-desktop-${discordWithVulkan.version}";
+    paths = [ discordLauncher discordWithVulkan ];
+  };
 in
 
 {
@@ -26,7 +43,7 @@ in
   home.packages = lib.optionals pkgs.stdenv.hostPlatform.isLinux (
     with pkgs;
     [
-      discordWithVulkan
+      discordDesktop
       slack
       telegram-desktop
       libreoffice
@@ -45,6 +62,7 @@ in
   # activated Home Manager profile until the next system activation/login.
   # Keep the comms launch names used by niri-ctx available immediately.
   home.file = lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
+    ".local/bin/discord".source = lib.getExe' discordDesktop "discord";
     ".local/bin/slack".source = lib.getExe pkgs.slack;
     ".local/bin/Telegram".source = lib.getExe pkgs.telegram-desktop;
     ".local/bin/telegram-desktop".source = lib.getExe pkgs.telegram-desktop;
@@ -59,7 +77,7 @@ in
     name = "Discord";
     genericName = "Internet Messenger";
     icon = "discord";
-    exec = "env -u NIXOS_OZONE_WL discord --ozone-platform=x11 %U";
+    exec = "${lib.getExe' discordDesktop "discord"} %U";
     terminal = false;
     mimeType = [ "x-scheme-handler/discord" ];
     categories = [
