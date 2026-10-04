@@ -64,7 +64,7 @@ lib.mkIf pkgs.stdenv.hostPlatform.isLinux (
       categories = [ "Development" ];
       icon = "${t3Contents}/usr/share/icons/hicolor/512x512/apps/t3code.png";
       mimeType = [ "x-scheme-handler/t3code" ];
-      settings.StartupWMClass = "t3code";
+      settings.StartupWMClass = "com.t3tools.T3Code";
     };
 
     # The app tries to register this itself, but HM owns mimeapps.list.
