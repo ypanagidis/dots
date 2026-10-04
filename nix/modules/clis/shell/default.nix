@@ -134,20 +134,6 @@ in
         nix flake update helium-flake && ${rebuild}
         cd - >/dev/null
       }
-
-      ut3() {
-        local original_dir="$PWD"
-        cd ${flakeDir}/modules/ides/t3 || return 1
-
-        if ./update-t3.sh "$@"; then
-          echo "Rebuilding..."
-          ${rebuild}
-        else
-          echo "No update needed or fetch failed"
-        fi
-
-        cd "$original_dir"
-      }
     '';
   };
 }

@@ -7,6 +7,20 @@
     electron
   ];
 
+  # Run AppImages directly (binfmt hands them to appimage-run). Self-updating
+  # AppImages need this: electron-updater relaunches the new file by path.
+  # Used by T3 Code (modules/ides/t3), which also needs the extra libs below.
+  programs.appimage = {
+    enable = true;
+    binfmt = true;
+    package = pkgs.appimage-run.override {
+      extraPkgs = p: [
+        p.libnotify
+        p.libxkbfile
+      ];
+    };
+  };
+
   programs.nix-ld = {
     enable = true;
 
