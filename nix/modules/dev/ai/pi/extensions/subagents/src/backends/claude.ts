@@ -29,10 +29,11 @@ import type {
   RunOutcome,
   SpawnTask,
   SubagentEvent,
+  SubagentInputSource,
   SubagentMeta,
   TranscriptPart,
 } from "../domain.ts";
-import { SendError, SpawnError } from "../domain.ts";
+import { ReplyError, SendError, SpawnError } from "../domain.ts";
 
 const CLAUDE_CONTEXT_WINDOW = 200_000;
 const INTERRUPT_TIMEOUT_MS = 2_000;
@@ -415,8 +416,13 @@ const makeClaudeSession = (
         if (tokens !== undefined) emit({ _tag: "UsageChanged", tokens });
       }
 
-      const text = message.message.content
-        .filter((block) => block.type === "text")
+      const text = (
+        message.message.content as Array<{ type: string; text?: string }>
+      )
+        .filter(
+          (block): block is { type: string; text: string } =>
+            block.type === "text" && typeof block.text === "string",
+        )
         .map((block) => block.text)
         .join("\n")
         .trim();
@@ -591,7 +597,10 @@ const makeClaudeSession = (
 
     void pump();
 
-    const submit = (text: string) => {
+    const submit = (
+      text: string,
+      source: "initial" | SubagentInputSource,
+    ) => {
       const wasActive = state.activeRun;
       const message = input.push(text);
       if (!message) return false;
@@ -606,7 +615,7 @@ const makeClaudeSession = (
       // into an active run must NOT re-emit RunStarted — its own turn begins
       // later via beginQueuedRunIfNeeded.
       if (!wasActive) emit({ _tag: "RunStarted" });
-      emit({ _tag: "UserMessage", text });
+      emit({ _tag: "UserMessage", text, source });
       if (wasActive) {
         state.queued.push({
           text,
@@ -632,19 +641,23 @@ const makeClaudeSession = (
     };
 
     emit({ _tag: "MetaChanged", meta: state.meta });
-    submit(task.prompt);
+    submit(task.prompt, "initial");
 
     return {
       meta: Effect.sync(() => state.meta),
       events: Stream.fromQueue(events),
-      send: (text) =>
+      send: (text, source) =>
         Effect.suspend((): Effect.Effect<void, SendError> => {
           if (state.closed) {
             return new SendError({ message: "Subagent session is closed." });
           }
-          return submit(text)
+          return submit(text, source)
             ? Effect.void
             : new SendError({ message: "Subagent session is closed." });
+        }),
+      reply: (requestId) =>
+        new ReplyError({
+          message: `Claude subagents do not support teamlead_ask replies (${requestId}).`,
         }),
       interrupt: Effect.promise(async () => {
         if (state.closed || !state.activeRun) return;
@@ -695,7 +708,12 @@ const makeClaudeSession = (
 
 export const claudeBackend: SubagentBackend = {
   name: "claude",
-  capabilities: { steering: true, modelSelection: true, reasoningEffort: true },
+  capabilities: {
+    steering: true,
+    requestReply: false,
+    modelSelection: true,
+    reasoningEffort: true,
+  },
   available: Effect.sync(() => resolveClaudeBinary() !== undefined),
   spawn: makeClaudeSession,
 };

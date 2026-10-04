@@ -1,6 +1,6 @@
 /**
  * Takeover UI for subagents (ported from v1, rendering from the synchronous
- * SubagentReadModel instead of live pi sessions):
+ * recursive SubagentTreeView instead of live pi sessions):
  * - SubagentDashboard: full popup (overlay) listing all subagents.
  * - TakeoverView: full interactive view of one subagent with an input line
  *   to steer/continue it.
@@ -15,7 +15,11 @@ import type { Component, Focusable, TUI } from "@earendil-works/pi-tui";
 import { Input, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import { formatElapsed, type SubagentSnapshot } from "../domain.ts";
 import { formatContextUtilization } from "../format.ts";
-import type { SubagentReadModel } from "../manager.ts";
+import {
+  subagentTreePrefix,
+  type SubagentTreeNode,
+  type SubagentTreeView,
+} from "../subagent-tree.ts";
 import { buildTranscriptLines } from "./transcript.ts";
 
 function configuredKeys(
@@ -47,6 +51,42 @@ function statusWord(snap: SubagentSnapshot, theme: Theme): string {
   }
 }
 
+export function renderDashboardTreeRow(
+  node: SubagentTreeNode,
+  isSelected: boolean,
+  width: number,
+  theme: Theme,
+): string {
+  const snap = node.snapshot;
+  const marker = isSelected ? theme.fg("accent", "❯") : " ";
+  const title = isSelected
+    ? theme.fg("accent", snap.title)
+    : theme.fg("text", snap.title);
+  const replyBadge =
+    snap.pendingQuestions.length > 0
+      ? ` ${theme.fg("warning", `?${snap.pendingQuestions.length}`)}`
+      : "";
+  const left =
+    ` ${marker} ${theme.fg("dim", subagentTreePrefix(node))}` +
+    `${statusGlyph(snap, theme)} ${title} ${theme.fg("dim", snap.id)}${replyBadge}`;
+
+  const utilization = formatContextUtilization(snap.usage);
+  const dot = theme.fg("dim", " · ");
+  const rightParts = [
+    theme.fg("muted", snap.backend),
+    theme.fg("muted", snap.meta.modelLabel ?? "?"),
+    ...(utilization ? [theme.fg("muted", utilization)] : []),
+    theme.fg("muted", formatElapsed(snap)),
+    statusWord(snap, theme),
+  ];
+  const right = `${rightParts.join(dot)} `;
+  const rightWidth = visibleWidth(right);
+  const leftMax = Math.max(0, width - rightWidth - 2);
+  const leftTruncated = truncateToWidth(left, leftMax);
+  const gap = Math.max(2, width - visibleWidth(leftTruncated) - rightWidth);
+  return truncateToWidth(leftTruncated + " ".repeat(gap) + right, width);
+}
+
 // --- Entry points --------------------------------------------------------------
 
 export interface TakeoverOptions {
@@ -55,14 +95,14 @@ export interface TakeoverOptions {
 
 export async function openSubagentTakeover(
   ctx: ExtensionCommandContext,
-  view: SubagentReadModel,
-  id: string,
+  view: SubagentTreeView,
+  key: string,
   options?: TakeoverOptions,
 ) {
-  if (!view.get(id)) return;
+  if (!view.get(key)) return;
   await ctx.ui.custom<null>(
     (tui, theme, keybindings, done) =>
-      new TakeoverView(tui, theme, keybindings, id, view, done, options),
+      new TakeoverView(tui, theme, keybindings, key, view, done, options),
     {
       overlay: true,
       overlayOptions: { anchor: "center", width: "100%", maxHeight: "100%" },
@@ -72,7 +112,7 @@ export async function openSubagentTakeover(
 
 export async function openSubagentPicker(
   ctx: ExtensionCommandContext,
-  view: SubagentReadModel,
+  view: SubagentTreeView,
 ) {
   const selection: DashboardSelection = { index: 0 };
 
@@ -102,29 +142,29 @@ export async function openSubagentPicker(
 // --- Dashboard (fullscreen overlay) ----------------------------------------------
 
 export interface DashboardSelection {
-  id?: string;
+  key?: string;
   index: number;
 }
 
 export function reconcileDashboardSelection(
   selection: DashboardSelection,
-  subs: ReadonlyArray<Pick<SubagentSnapshot, "id">>,
+  nodes: ReadonlyArray<Pick<SubagentTreeNode, "key">>,
 ) {
-  const stableIndex = selection.id
-    ? subs.findIndex((snap) => snap.id === selection.id)
+  const stableIndex = selection.key
+    ? nodes.findIndex((node) => node.key === selection.key)
     : -1;
   selection.index =
     stableIndex >= 0
       ? stableIndex
-      : Math.min(Math.max(0, selection.index), Math.max(0, subs.length - 1));
-  selection.id = subs[selection.index]?.id;
+      : Math.min(Math.max(0, selection.index), Math.max(0, nodes.length - 1));
+  selection.key = nodes[selection.index]?.key;
 }
 
 class SubagentDashboard implements Component {
   private tui: TUI;
   private theme: Theme;
   private keybindings: KeybindingsManager;
-  private view: SubagentReadModel;
+  private view: SubagentTreeView;
   private selection: DashboardSelection;
   private done: (value: string | null) => void;
 
@@ -136,7 +176,7 @@ class SubagentDashboard implements Component {
     tui: TUI,
     theme: Theme,
     keybindings: KeybindingsManager,
-    view: SubagentReadModel,
+    view: SubagentTreeView,
     selection: DashboardSelection,
     done: (value: string | null) => void,
   ) {
@@ -151,7 +191,7 @@ class SubagentDashboard implements Component {
     this.unsubChange = view.subscribe(() => this.tui.requestRender());
   }
 
-  private subs(): ReadonlyArray<SubagentSnapshot> {
+  private nodes(): ReadonlyArray<SubagentTreeNode> {
     return this.view.list();
   }
 
@@ -172,38 +212,40 @@ class SubagentDashboard implements Component {
   }
 
   handleInput(data: string): void {
-    const subs = this.subs();
-    reconcileDashboardSelection(this.selection, subs);
+    const nodes = this.nodes();
+    reconcileDashboardSelection(this.selection, nodes);
 
     if (this.keybindings.matches(data, "tui.select.cancel")) {
       this.close(null);
       return;
     }
     if (this.keybindings.matches(data, "tui.select.confirm")) {
-      const snap = subs[this.selection.index];
-      if (snap) this.close(snap.id);
+      const node = nodes[this.selection.index];
+      if (node) this.close(node.key);
       return;
     }
     if (this.keybindings.matches(data, "tui.select.up") || data === "k") {
-      if (subs.length > 0) {
+      if (nodes.length > 0) {
         this.selection.index =
-          (this.selection.index - 1 + subs.length) % subs.length;
-        this.selection.id = subs[this.selection.index]?.id;
+          (this.selection.index - 1 + nodes.length) % nodes.length;
+        this.selection.key = nodes[this.selection.index]?.key;
         this.tui.requestRender();
       }
       return;
     }
     if (this.keybindings.matches(data, "tui.select.down") || data === "j") {
-      if (subs.length > 0) {
-        this.selection.index = (this.selection.index + 1) % subs.length;
-        this.selection.id = subs[this.selection.index]?.id;
+      if (nodes.length > 0) {
+        this.selection.index = (this.selection.index + 1) % nodes.length;
+        this.selection.key = nodes[this.selection.index]?.key;
         this.tui.requestRender();
       }
       return;
     }
     if (data === "x") {
-      const snap = subs[this.selection.index];
-      if (snap && snap.status === "running") this.view.requestAbort(snap.id);
+      const node = nodes[this.selection.index];
+      if (node?.snapshot.status === "running") {
+        this.view.requestAbort(node.key);
+      }
       return;
     }
   }
@@ -228,8 +270,8 @@ class SubagentDashboard implements Component {
 
   render(width: number): string[] {
     const theme = this.theme;
-    const subs = this.subs();
-    reconcileDashboardSelection(this.selection, subs);
+    const nodes = this.nodes();
+    reconcileDashboardSelection(this.selection, nodes);
 
     const rows = this.tui.terminal.rows || 30;
     // Render exactly terminal rows - 1 so the overlay covers the header,
@@ -244,7 +286,7 @@ class SubagentDashboard implements Component {
     const headerLeft = theme.fg("accent", theme.bold("Subagents"));
     const headerRight = theme.fg(
       "muted",
-      `${subs.length} agent${subs.length === 1 ? "" : "s"}`,
+      `${nodes.length} agent${nodes.length === 1 ? "" : "s"}`,
     );
     const headerPad = Math.max(
       1,
@@ -258,16 +300,18 @@ class SubagentDashboard implements Component {
     );
 
     // Top border with panel title
-    const settled = subs.filter((s) => s.status !== "running").length;
+    const settled = nodes.filter(
+      (node) => node.snapshot.status !== "running",
+    ).length;
     lines.push(
       theme.fg("border", "╭") +
-        this.borderSegment(innerWidth, `agents · ${settled}/${subs.length}`) +
+        this.borderSegment(innerWidth, `tree · ${settled}/${nodes.length} settled`) +
         theme.fg("border", "╮"),
     );
 
     // Rows
     const divider = theme.fg("border", "│");
-    const rowLines = this.renderRows(subs, innerWidth, bodyHeight);
+    const rowLines = this.renderRows(nodes, innerWidth, bodyHeight);
     for (let i = 0; i < bodyHeight; i++) {
       lines.push(divider + this.pad(rowLines[i] ?? "", innerWidth) + divider);
     }
@@ -294,7 +338,7 @@ class SubagentDashboard implements Component {
   }
 
   private renderRows(
-    subs: ReadonlyArray<SubagentSnapshot>,
+    nodes: ReadonlyArray<SubagentTreeNode>,
     width: number,
     height: number,
   ): string[] {
@@ -303,51 +347,32 @@ class SubagentDashboard implements Component {
 
     // Scroll window around selection
     let start = 0;
-    if (subs.length > height) {
+    if (nodes.length > height) {
       start = Math.min(
         Math.max(0, this.selection.index - Math.floor(height / 2)),
-        subs.length - height,
+        nodes.length - height,
       );
     }
-    const visible = subs.slice(start, start + height);
+    const visible = nodes.slice(start, start + height);
 
     for (let i = 0; i < visible.length; i++) {
-      const snap = visible[i];
       const index = start + i;
-      const isSelected = index === this.selection.index;
-
-      // Left: marker, status square, title, dim id
-      const marker = isSelected ? theme.fg("accent", "❯") : " ";
-      const title = isSelected
-        ? theme.fg("accent", snap.title)
-        : theme.fg("text", snap.title);
-      const left = ` ${marker} ${statusGlyph(snap, theme)} ${title} ${theme.fg("dim", snap.id)}`;
-
-      // Right: backend · model · context utilization · elapsed · status
-      const utilization = formatContextUtilization(snap.usage);
-      const dot = theme.fg("dim", " · ");
-      const rightParts = [
-        theme.fg("muted", snap.backend),
-        theme.fg("muted", snap.meta.modelLabel ?? "?"),
-        ...(utilization ? [theme.fg("muted", utilization)] : []),
-        theme.fg("muted", formatElapsed(snap)),
-        statusWord(snap, theme),
-      ];
-      const right = `${rightParts.join(dot)} `;
-
-      const rightWidth = visibleWidth(right);
-      const leftMax = Math.max(0, width - rightWidth - 2);
-      const leftTruncated = truncateToWidth(left, leftMax);
-      const gap = Math.max(2, width - visibleWidth(leftTruncated) - rightWidth);
-      out.push(truncateToWidth(leftTruncated + " ".repeat(gap) + right, width));
+      out.push(
+        renderDashboardTreeRow(
+          visible[i],
+          index === this.selection.index,
+          width,
+          theme,
+        ),
+      );
     }
 
     if (start > 0) {
       out[0] = truncateToWidth(theme.fg("dim", `   ... ${start} more`), width);
     }
-    if (start + height < subs.length) {
+    if (start + height < nodes.length) {
       out[out.length - 1] = truncateToWidth(
-        theme.fg("dim", `   ... ${subs.length - start - height} more`),
+        theme.fg("dim", `   ... ${nodes.length - start - height} more`),
         width,
       );
     }
@@ -365,8 +390,8 @@ class TakeoverView implements Component, Focusable {
   private tui: TUI;
   private theme: Theme;
   private keybindings: KeybindingsManager;
-  private id: string;
-  private view: SubagentReadModel;
+  private key: string;
+  private view: SubagentTreeView;
   private done: (value: null) => void;
   private options?: TakeoverOptions;
 
@@ -391,33 +416,33 @@ class TakeoverView implements Component, Focusable {
     tui: TUI,
     theme: Theme,
     keybindings: KeybindingsManager,
-    id: string,
-    view: SubagentReadModel,
+    key: string,
+    view: SubagentTreeView,
     done: (value: null) => void,
     options?: TakeoverOptions,
   ) {
     this.tui = tui;
     this.theme = theme;
     this.keybindings = keybindings;
-    this.id = id;
+    this.key = key;
     this.view = view;
     this.done = done;
     this.options = options;
-    this.unsubscribe = view.subscribeTo(id, () => this.scheduleRender());
+    this.unsubscribe = view.subscribeTo(key, () => this.scheduleRender());
     // Elapsed time in the header ticks along at 1Hz.
     this.ticker = setInterval(() => this.tui.requestRender(), 1000);
     this.input.onSubmit = (value: string) => {
       const text = value.trim();
       if (!text) return;
       this.input.setValue("");
-      this.view.requestSend(this.id, text);
+      this.view.requestSend(this.key, text);
       this.scrollOffset = 0;
       this.tui.requestRender();
     };
   }
 
-  private snap(): SubagentSnapshot | undefined {
-    return this.view.get(this.id);
+  private node(): SubagentTreeNode | undefined {
+    return this.view.get(this.key);
   }
 
   private scheduleRender() {
@@ -450,8 +475,10 @@ class TakeoverView implements Component, Focusable {
 
   handleInput(data: string): void {
     if (this.keybindings.matches(data, "app.clear")) {
-      const snap = this.snap();
-      if (snap?.status === "running") this.view.requestAbort(this.id);
+      const node = this.node();
+      if (node?.snapshot.status === "running") {
+        this.view.requestAbort(this.key);
+      }
       return;
     }
     if (
@@ -502,11 +529,12 @@ class TakeoverView implements Component, Focusable {
     const theme = this.theme;
     const border = theme.fg("borderAccent", "─".repeat(Math.max(1, width)));
     const lines: string[] = [];
-    const snap = this.snap();
+    const node = this.node();
+    const snap = node?.snapshot;
 
-    if (!snap) {
+    if (!node || !snap) {
       lines.push(border);
-      lines.push(theme.fg("dim", `${this.id} is no longer tracked`));
+      lines.push(theme.fg("dim", "subagent is no longer tracked"));
       lines.push(border);
       return lines;
     }
@@ -515,8 +543,20 @@ class TakeoverView implements Component, Focusable {
     const utilization = formatContextUtilization(snap.usage);
     const header =
       `${statusGlyph(snap, theme)} ` +
-      theme.fg("accent", theme.bold(`${snap.id} · ${snap.title}`)) +
-      theme.fg("muted", ` · ${snap.status} · ${formatElapsed(snap)}`) +
+      theme.fg(
+        "accent",
+        theme.bold(`${node.idPath.join(" › ")} · ${snap.title}`),
+      ) +
+      theme.fg(
+        "muted",
+        ` · ${snap.status} · run ${snap.run} · ${formatElapsed(snap)}`,
+      ) +
+      (snap.pendingQuestions.length > 0
+        ? theme.fg(
+            "warning",
+            ` · ? ${snap.pendingQuestions.length} awaiting reply`,
+          )
+        : "") +
       (this.options?.badge
         ? theme.fg("muted", ` · ${this.options.badge}`)
         : "") +

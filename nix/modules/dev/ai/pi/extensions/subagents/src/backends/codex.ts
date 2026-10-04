@@ -20,10 +20,11 @@ import type {
   RunOutcome,
   SpawnTask,
   SubagentEvent,
+  SubagentInputSource,
   SubagentMeta,
   TranscriptPart,
 } from "../domain.ts";
-import { SendError, SpawnError } from "../domain.ts";
+import { ReplyError, SendError, SpawnError } from "../domain.ts";
 
 const REQUEST_TIMEOUT_MS = 30_000;
 const MODEL_LIST_TIMEOUT_MS = 5_000;
@@ -345,7 +346,10 @@ const makeCodexSession = (
       runError: undefined as string | undefined,
       finalText: "",
       lastAssistantText: "",
-      pendingPrompts: [] as string[],
+      pendingPrompts: [] as Array<{
+        readonly text: string;
+        readonly source: SubagentInputSource;
+      }>,
       nextRequestId: 0,
       stderr: "",
       meta: {
@@ -397,7 +401,7 @@ const makeCodexSession = (
     };
 
     const queuedView = () =>
-      state.pendingPrompts.map((text) => ({
+      state.pendingPrompts.map(({ text }) => ({
         text,
         kind: "follow-up" as const,
       }));
@@ -407,7 +411,7 @@ const makeCodexSession = (
       const next = state.pendingPrompts.shift();
       if (next === undefined) return;
       emit({ _tag: "QueueChanged", queued: queuedView() });
-      startRun(next);
+      startRun(next.text, next.source);
     };
 
     const settleRun = (outcome: RunOutcome, serial = state.runSerial) => {
@@ -447,7 +451,10 @@ const makeCodexSession = (
       });
     };
 
-    function startRun(text: string) {
+    function startRun(
+      text: string,
+      source: "initial" | SubagentInputSource,
+    ) {
       if (state.closed || state.activeRun) return;
       const threadId = state.meta.nativeSessionId;
       if (!threadId) return;
@@ -459,7 +466,7 @@ const makeCodexSession = (
       state.runError = undefined;
       state.finalText = "";
       state.lastAssistantText = "";
-      emit({ _tag: "UserMessage", text });
+      emit({ _tag: "UserMessage", text, source });
       emit({ _tag: "RunStarted" });
 
       const params: JsonRecord = {
@@ -927,22 +934,26 @@ const makeCodexSession = (
       );
     }
     emit({ _tag: "MetaChanged", meta: state.meta });
-    startRun(task.prompt);
+    startRun(task.prompt, "initial");
 
     return {
       meta: Effect.sync(() => state.meta),
       events: Stream.fromQueue(events),
-      send: (text) =>
+      send: (text, source) =>
         Effect.suspend((): Effect.Effect<void, SendError> => {
           if (state.closed) {
             return new SendError({ message: "Subagent session is closed." });
           }
           if (state.activeRun) {
-            state.pendingPrompts.push(text);
+            state.pendingPrompts.push({ text, source });
             emit({ _tag: "QueueChanged", queued: queuedView() });
             return Effect.void;
           }
-          return Effect.sync(() => startRun(text));
+          return Effect.sync(() => startRun(text, source));
+        }),
+      reply: (requestId) =>
+        new ReplyError({
+          message: `Codex subagents do not support teamlead_ask replies (${requestId}).`,
         }),
       interrupt: Effect.promise(async () => {
         if (state.closed || !state.activeRun) return;
@@ -1052,6 +1063,7 @@ export const codexBackend: SubagentBackend = {
   name: "codex",
   capabilities: {
     steering: false,
+    requestReply: false,
     modelSelection: true,
     reasoningEffort: true,
   },

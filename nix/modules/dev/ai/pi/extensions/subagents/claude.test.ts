@@ -1,10 +1,16 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { Effect } from "effect";
-import { SubagentManager } from "./src/manager.ts";
+import {
+  SubagentManager,
+  type SubagentManagerShape,
+} from "./src/manager.ts";
 import { claudeBackend } from "./src/backends/claude.ts";
 import type { ParentContext, SpawnTask } from "./src/domain.ts";
-import { createSubagentRuntime, runTool } from "./src/runtime.ts";
+import {
+  createSubagentRuntimeWithBackends,
+  runTool,
+} from "./src/runtime.ts";
 
 const parent: ParentContext = {
   parentCwd: process.cwd(),
@@ -40,6 +46,16 @@ function deadline<A>(operation: Promise<A>, timeoutMs: number) {
   });
 }
 
+function waitForSettlement(manager: SubagentManagerShape, id: string) {
+  return new Promise<void>((resolve) => {
+    const check = () => {
+      if (manager.view.get(id)?.status !== "running") resolve();
+      else setTimeout(check, 50);
+    };
+    check();
+  });
+}
+
 test(
   "Claude backend completes a live manager run",
   { timeout: 60_000 },
@@ -49,14 +65,14 @@ test(
       return;
     }
 
-    const runtime = createSubagentRuntime();
+    const runtime = createSubagentRuntimeWithBackends([claudeBackend]);
     try {
       const manager = await runtime.runPromise(SubagentManager);
       const started = await runTool(
         runtime,
         manager.spawn("claude", task("Reply with exactly: hello claude")),
       );
-      await deadline(runTool(runtime, manager.waitFor([started.id])), 45_000);
+      await deadline(waitForSettlement(manager, started.id), 45_000);
 
       const done = manager.view.get(started.id);
       assert.equal(done?.status, "done");
@@ -78,7 +94,7 @@ test(
       return;
     }
 
-    const runtime = createSubagentRuntime();
+    const runtime = createSubagentRuntimeWithBackends([claudeBackend]);
     try {
       const manager = await runtime.runPromise(SubagentManager);
       const started = await runTool(

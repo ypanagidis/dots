@@ -3,8 +3,14 @@ import test from "node:test";
 import { Effect } from "effect";
 import { codexBackend } from "./src/backends/codex.ts";
 import type { ParentContext, SpawnTask } from "./src/domain.ts";
-import { SubagentManager } from "./src/manager.ts";
-import { createSubagentRuntime, runTool } from "./src/runtime.ts";
+import {
+  SubagentManager,
+  type SubagentManagerShape,
+} from "./src/manager.ts";
+import {
+  createSubagentRuntimeWithBackends,
+  runTool,
+} from "./src/runtime.ts";
 
 const parent: ParentContext = {
   parentCwd: process.cwd(),
@@ -37,6 +43,16 @@ async function codexAvailable() {
   return Effect.runPromise(codexBackend.available);
 }
 
+function waitForSettlement(manager: SubagentManagerShape, id: string) {
+  return new Promise<void>((resolve) => {
+    const check = () => {
+      if (manager.view.get(id)?.status !== "running") resolve();
+      else setTimeout(check, 50);
+    };
+    check();
+  });
+}
+
 test(
   "Codex backend completes a live manager run",
   { timeout: 75_000 },
@@ -46,7 +62,7 @@ test(
       return;
     }
 
-    const runtime = createSubagentRuntime();
+    const runtime = createSubagentRuntimeWithBackends([codexBackend]);
     try {
       const manager = await runtime.runPromise(SubagentManager);
       const spawned = await runTool(
@@ -54,7 +70,7 @@ test(
         manager.spawn("codex", task("Reply with exactly: hello codex")),
       );
 
-      await deadline(runTool(runtime, manager.waitFor([spawned.id])), 60_000);
+      await deadline(waitForSettlement(manager, spawned.id), 60_000);
       const done = manager.view.get(spawned.id);
       assert.equal(done?.status, "done");
       assert.match(done?.finalText ?? "", /hello codex/i);
@@ -76,7 +92,7 @@ test(
       return;
     }
 
-    const runtime = createSubagentRuntime();
+    const runtime = createSubagentRuntimeWithBackends([codexBackend]);
     try {
       const manager = await runtime.runPromise(SubagentManager);
       const spawned = await runTool(

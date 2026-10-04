@@ -5,7 +5,7 @@
   "scripts": {
     "check": "tsc --noEmit -p .",
     "prepare": "effect-tsgo patch",
-    "test": "node --test --experimental-strip-types manager.test.ts result-delivery.test.ts context-usage.test.ts takeover.test.ts by-the-way.test.ts",
+    "test": "node --test --experimental-strip-types manager.test.ts result-delivery.test.ts communication.test.ts communication-rendering.test.ts background-activity.test.ts async-wait.test.ts subagent-depth.test.ts subagent-tree.test.ts prompt.test.ts tool-call-timeout.test.ts context-usage.test.ts takeover.test.ts running-subagents.test.ts by-the-way.test.ts recovery.test.ts spawn-model.test.ts",
     "test:live": "node --test --experimental-strip-types claude.test.ts codex.test.ts"
   },
   "dependencies": {

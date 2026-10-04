@@ -12,16 +12,20 @@ import type { Effect, Scope, Stream } from "effect";
 import { Context } from "effect";
 import type {
   BackendName,
+  ReplyError,
   SendError,
   SpawnError,
   SpawnTask,
   SubagentEvent,
+  SubagentInputSource,
   SubagentMeta,
 } from "./domain.ts";
 
 export interface BackendCapabilities {
   /** Can send() steer a live run (vs. only starting a fresh run when idle). */
   readonly steering: boolean;
+  /** Supports an out-of-band reply to a child teamlead_ask tool call. */
+  readonly requestReply: boolean;
   readonly modelSelection: boolean;
   readonly reasoningEffort: boolean;
 }
@@ -39,10 +43,22 @@ export interface SubagentSession {
    */
   readonly events: Stream.Stream<SubagentEvent>;
   /**
-   * Steer the active run, or start a fresh run when idle (v1 `manager.send`
-   * semantics — the "is a run active" decision is backend-native state).
+   * Optional explicit initial-start gate. Backends that provide it must remain
+   * idle until the manager has registered the session and durably checkpointed
+   * its public id/session link.
    */
-  send(text: string): Effect.Effect<void, SendError>;
+  readonly start?: Effect.Effect<void, SpawnError>;
+  /**
+   * Steer the active run, or start a fresh run when idle. `source` preserves
+   * whether the turn came from teamlead tooling or direct takeover/user input;
+   * the "is a run active" decision remains backend-native state.
+   */
+  send(
+    text: string,
+    source: SubagentInputSource,
+  ): Effect.Effect<void, SendError>;
+  /** Resolve one pending child question without queueing a child user turn. */
+  reply(requestId: string, text: string): Effect.Effect<void, ReplyError>;
   /**
    * Interrupt the active run. Resolves once the backend acknowledges; the
    * corresponding RunSettled(Interrupted) arrives on `events`. Callers bound

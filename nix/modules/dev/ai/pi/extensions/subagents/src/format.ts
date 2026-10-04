@@ -53,6 +53,7 @@ interface ActivityCounts {
   running: number;
   done: number;
   failed: number;
+  awaitingReply?: number;
 }
 
 const SQUARE = "■";
@@ -67,6 +68,11 @@ export function formatActivityStatus(theme: Theme, counts: ActivityCounts) {
   }
   if (counts.failed > 0) {
     parts.push(theme.fg("error", `${SQUARE} ${counts.failed} failed`));
+  }
+  if ((counts.awaitingReply ?? 0) > 0) {
+    parts.push(
+      theme.fg("warning", `? ${counts.awaitingReply} awaiting reply`),
+    );
   }
   parts.push(theme.fg("accent", "/subagents") + theme.fg("dim", " to view"));
 

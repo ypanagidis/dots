@@ -9,6 +9,7 @@
 
 import type { ModelRegistry } from "@earendil-works/pi-coding-agent";
 import { Data } from "effect";
+import type { SubagentTreeRegistry } from "./subagent-tree.ts";
 
 export const BACKEND_NAMES = ["pi", "claude", "codex"] as const;
 export type BackendName = (typeof BACKEND_NAMES)[number];
@@ -44,11 +45,27 @@ export interface ParentContext {
   readonly inheritedThinkingLevel?: string;
   /** Parent model registry; required by the pi backend to resolve models. */
   readonly modelRegistry?: ModelRegistry;
+  /** Root-owned in-process tree registry propagated through hidden child bridges. */
+  readonly treeRegistry?: SubagentTreeRegistry;
+}
+
+export interface ResumeTask {
+  /** Stable public id from the parent session's durable recovery manifest. */
+  readonly id: string;
+  /** Existing child Pi JSONL to reopen instead of creating a new session. */
+  readonly sessionFilePath: string;
+  /** Preserve completion identity across process restarts. */
+  readonly run: number;
+  readonly createdAt: number;
+  /** Messages accepted by the child but not durably delivered before restart. */
+  readonly queued?: ReadonlyArray<QueuedMessage>;
 }
 
 export interface SpawnTask {
   /** Omitted for normal tool-driven spawns. */
   readonly origin?: SubagentOrigin;
+  /** Present only when reattaching a child after reload/process restart. */
+  readonly resume?: ResumeTask;
   readonly prompt: string;
   readonly title: string;
   readonly cwd: string;
@@ -60,6 +77,8 @@ export interface SpawnTask {
   readonly model?: string;
   /** Shared effort scale; each backend maps it to its native equivalent. */
   readonly reasoningEffort?: ReasoningEffort;
+  /** Additional managed descendant generations the spawned Pi session may create. */
+  readonly allowedSubagentsDepth?: number;
   readonly parent: ParentContext;
 }
 
@@ -71,7 +90,7 @@ export interface SubagentMeta {
   readonly contextWindow?: number;
   /** pi session file / Claude projects JSONL / Codex rollout path. */
   readonly sessionFilePath?: string;
-  /** Claude session id / Codex conversation id. */
+  /** Pi child session id / Claude session id / Codex conversation id. */
   readonly nativeSessionId?: string;
 }
 
@@ -103,6 +122,10 @@ export type TranscriptItem =
       readonly name: string;
       readonly isError: boolean;
       readonly outputPreview?: string;
+    }
+  | {
+      readonly kind: "communication";
+      readonly message: SubagentCommunication;
     };
 
 export interface LiveToolState {
@@ -117,6 +140,38 @@ export interface LiveToolState {
 export interface QueuedMessage {
   readonly text: string;
   readonly kind: "steer" | "follow-up";
+}
+
+/** Provenance for a follow-up delivered into a child user turn. */
+export type SubagentInputSource = "teamlead" | "user";
+
+// --- Teamlead communication --------------------------------------------------
+
+export type SubagentCommunicationKind =
+  | "guidance"
+  | "update"
+  | "question"
+  | "reply"
+  | "resolution";
+export type SubagentQuestionOutcome =
+  | "replied"
+  | "timed-out"
+  | "cancelled";
+
+/** Immutable communication item shown in the parent and takeover transcript. */
+export interface SubagentCommunication {
+  readonly messageId: string;
+  readonly requestId?: string;
+  readonly kind: SubagentCommunicationKind;
+  readonly text: string;
+  readonly createdAt: number;
+}
+
+export interface PendingQuestion {
+  readonly requestId: string;
+  readonly messageId: string;
+  readonly question: string;
+  readonly createdAt: number;
 }
 
 // --- Events ------------------------------------------------------------------
@@ -141,7 +196,12 @@ export type SubagentEvent =
   | { readonly _tag: "RunStarted" }
   | { readonly _tag: "RunSettled"; readonly outcome: RunOutcome }
   // transcript building blocks
-  | { readonly _tag: "UserMessage"; readonly text: string }
+  | {
+      readonly _tag: "UserMessage";
+      readonly text: string;
+      /** Initial/user prompts render normally; teamlead guidance is inter-agent communication. */
+      readonly source: "initial" | SubagentInputSource;
+    }
   | {
       readonly _tag: "AssistantDelta";
       readonly kind: "text" | "thinking";
@@ -175,6 +235,18 @@ export type SubagentEvent =
       readonly queued: ReadonlyArray<QueuedMessage>;
     }
   | {
+      readonly _tag: "MessageToLead";
+      readonly message: SubagentCommunication;
+    }
+  | {
+      readonly _tag: "QuestionClosed";
+      readonly requestId: string;
+      readonly messageId: string;
+      readonly outcome: SubagentQuestionOutcome;
+      readonly reply?: string;
+      readonly createdAt: number;
+    }
+  | {
       readonly _tag: "UsageChanged";
       readonly tokens?: number;
       readonly contextWindow?: number;
@@ -196,7 +268,11 @@ export interface SubagentSnapshot {
   readonly title: string;
   readonly prompt: string;
   readonly cwd: string;
+  /** Descendant-depth allowance granted when this child session was created. */
+  readonly allowedSubagentsDepth: number;
   readonly status: SubagentStatus;
+  /** Logical run number. Initial prompt is run 1; an idle restart increments it. */
+  readonly run: number;
   readonly createdAt: number;
   readonly settledAt?: number;
   readonly errorText?: string;
@@ -207,10 +283,20 @@ export interface SubagentSnapshot {
   readonly liveAssistant?: { readonly text: string; readonly thinking: string };
   readonly liveTools: ReadonlyArray<LiveToolState>;
   readonly queued: ReadonlyArray<QueuedMessage>;
+  readonly communications: ReadonlyArray<SubagentCommunication>;
+  readonly pendingQuestions: ReadonlyArray<PendingQuestion>;
   /** Final text of the most recent completed run (v1 `finalOutput`). */
   readonly finalText: string;
   /** Count of finalized assistant messages (for subagent_check). */
   readonly turns: number;
+}
+
+export type SubagentCompletionId = `${string}:run-${number}`;
+
+export function subagentCompletionId(
+  snap: Pick<SubagentSnapshot, "id" | "run">,
+): SubagentCompletionId {
+  return `${snap.id}:run-${snap.run}`;
 }
 
 /** Final text, or the live streaming buffer while a run is active (v1 `latestOutput`). */
@@ -249,5 +335,9 @@ export class ConcurrencyLimitError extends Data.TaggedError(
 }> {}
 
 export class SendError extends Data.TaggedError("SendError")<{
+  readonly message: string;
+}> {}
+
+export class ReplyError extends Data.TaggedError("ReplyError")<{
   readonly message: string;
 }> {}

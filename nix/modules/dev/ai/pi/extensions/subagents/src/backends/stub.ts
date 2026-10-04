@@ -24,9 +24,10 @@ import type {
   QueuedMessage,
   SpawnTask,
   SubagentEvent,
+  SubagentInputSource,
   SubagentMeta,
 } from "../domain.ts";
-import { SendError } from "../domain.ts";
+import { ReplyError, SendError } from "../domain.ts";
 
 export interface StubProfile {
   readonly backend: BackendName;
@@ -45,6 +46,7 @@ export function makeStubBackend(profile: StubProfile): SubagentBackend {
     name: profile.backend,
     capabilities: {
       steering: true,
+      requestReply: true,
       modelSelection: true,
       reasoningEffort: true,
     },
@@ -86,7 +88,10 @@ const makeStubSession = (
         sessionFilePath: sessionFile,
         nativeSessionId: sessionId,
       } satisfies SubagentMeta as SubagentMeta,
-      pending: [] as string[],
+      pending: [] as Array<{
+        readonly text: string;
+        readonly source: "initial" | SubagentInputSource;
+      }>,
       turnCount: 0,
       closed: false,
       /** True between the driver dequeuing a prompt and registering its turn fiber. */
@@ -94,10 +99,25 @@ const makeStubSession = (
     };
 
     const events = yield* Queue.make<SubagentEvent, Cause.Done>();
-    const inbox = yield* Queue.make<string, Cause.Done>();
-    const activeTurn = yield* Ref.make<Fiber.Fiber<void> | undefined>(
-      undefined,
-    );
+    const inbox = yield* Queue.make<
+      {
+        readonly text: string;
+        readonly source: "initial" | SubagentInputSource;
+      },
+      Cause.Done
+    >();
+    const activeTurn = yield* Ref.make<
+      Fiber.Fiber<void, ReplyError> | undefined
+    >(undefined);
+    let communicationCounter = 0;
+    let requestCounter = 0;
+    const pendingReplies = new Map<
+      string,
+      {
+        readonly messageId: string;
+        readonly resume: (effect: Effect.Effect<string, ReplyError>) => void;
+      }
+    >();
 
     const emit = (event: SubagentEvent) =>
       Effect.suspend(() => {
@@ -117,7 +137,55 @@ const makeStubSession = (
     const runTurn = (userText: string, turn: number) =>
       Effect.gen(function* () {
         yield* emit({ _tag: "RunStarted" });
+        // Mirrors backends that emit optimistic and native lifecycle starts;
+        // the manager must count one logical run, not two.
+        yield* emit({ _tag: "RunStarted" });
         const failing = userText.trimStart().startsWith("FAIL:");
+        let teamleadReply = "";
+        if (
+          (task.origin ?? "model") === "model" &&
+          userText.trimStart().startsWith("ASK:")
+        ) {
+          const question = userText.trimStart().slice(4).trim() || "Need guidance";
+          const requestId = `req-${++requestCounter}`;
+          const messageId = `child-msg-${++communicationCounter}`;
+          teamleadReply = yield* Effect.callback<string, ReplyError>((resume) => {
+            pendingReplies.set(requestId, { messageId, resume });
+            Queue.offerUnsafe(events, {
+              _tag: "MessageToLead",
+              message: {
+                messageId,
+                requestId,
+                kind: "question",
+                text: question,
+                createdAt: Date.now(),
+              },
+            });
+            return Effect.sync(() => {
+              if (!pendingReplies.delete(requestId)) return;
+              Queue.offerUnsafe(events, {
+                _tag: "QuestionClosed",
+                requestId,
+                messageId: `child-msg-${++communicationCounter}`,
+                outcome: "cancelled",
+                createdAt: Date.now(),
+              });
+            });
+          });
+        } else if (
+          (task.origin ?? "model") === "model" &&
+          userText.trimStart().startsWith("UPDATE:")
+        ) {
+          yield* emit({
+            _tag: "MessageToLead",
+            message: {
+              messageId: `child-msg-${++communicationCounter}`,
+              kind: "update",
+              text: userText.trimStart().slice(7).trim() || "Update",
+              createdAt: Date.now(),
+            },
+          });
+        }
 
         const thinking = "Looking at the task and planning an approach...";
         for (const delta of chunked(thinking, 16)) {
@@ -179,7 +247,8 @@ const makeStubSession = (
         const finalText =
           `[stub:${profile.backend}] completed: ${firstLine(userText).slice(0, 200)}\n\n` +
           `This is a stubbed ${profile.backend} subagent turn ${turn + 1}. ` +
-          `The real backend integration will replace this scripted output.`;
+          `The real backend integration will replace this scripted output.` +
+          (teamleadReply ? ` Teamlead replied: ${teamleadReply}` : "");
         for (const delta of chunked(finalText, 24)) {
           yield* emit({ _tag: "AssistantDelta", kind: "text", delta });
           yield* pause;
@@ -200,20 +269,24 @@ const makeStubSession = (
       });
 
     const queuedView = (): ReadonlyArray<QueuedMessage> =>
-      state.pending.map((text) => ({ text, kind: "steer" as const }));
+      state.pending.map(({ text }) => ({ text, kind: "steer" as const }));
 
     // Driver: one turn at a time, in submission order. Turns run as child
     // fibers so interrupt() stops the turn without killing the driver.
     const driver = Effect.gen(function* () {
       while (true) {
-        const text = yield* Queue.take(inbox);
+        const message = yield* Queue.take(inbox);
         state.dispatching = true;
         state.pending.shift();
         yield* emit({ _tag: "QueueChanged", queued: queuedView() });
-        yield* emit({ _tag: "UserMessage", text });
+        yield* emit({
+          _tag: "UserMessage",
+          text: message.text,
+          source: message.source,
+        });
         const turn = state.turnCount++;
         const fiber = yield* Effect.forkChild(
-          runTurn(text, turn).pipe(
+          runTurn(message.text, turn).pipe(
             Effect.onInterrupt(() =>
               emit({
                 _tag: "RunSettled",
@@ -238,20 +311,24 @@ const makeStubSession = (
       }),
     );
 
-    const submit = (text: string) =>
+    const submit = (
+      text: string,
+      source: "initial" | SubagentInputSource,
+    ) =>
       Effect.gen(function* () {
         if (state.closed) {
           return yield* new SendError({
             message: "Subagent session is closed.",
           });
         }
-        state.pending.push(text);
+        const message = { text, source } as const;
+        state.pending.push(message);
         const busy = (yield* Ref.get(activeTurn)) !== undefined;
         if (busy) {
           // Show the queued steer line until the driver picks it up.
           yield* emit({ _tag: "QueueChanged", queued: queuedView() });
         }
-        yield* Queue.offer(inbox, text);
+        yield* Queue.offer(inbox, message);
       });
 
     // Announce metadata, then kick off the initial run.
@@ -260,12 +337,37 @@ const makeStubSession = (
     );
     yield* emit({ _tag: "MetaChanged", meta: state.meta });
     // The session cannot be closed yet, so the initial submit cannot fail.
-    yield* submit(task.prompt).pipe(Effect.orDie);
+    yield* submit(task.prompt, "initial").pipe(Effect.orDie);
 
     return {
       meta: Effect.sync(() => state.meta),
       events: Stream.fromQueue(events),
-      send: submit,
+      send: (text, source) => submit(text, source),
+      reply: (requestId, text) =>
+        Effect.suspend((): Effect.Effect<void, ReplyError> => {
+          const pending = pendingReplies.get(requestId);
+          if (!pending) {
+            return new ReplyError({
+              message: `Question "${requestId}" is no longer pending.`,
+            });
+          }
+          const reply = text;
+          if (!reply.trim()) {
+            return new ReplyError({ message: "reply must not be empty." });
+          }
+          pendingReplies.delete(requestId);
+          return emit({
+            _tag: "QuestionClosed",
+            requestId,
+            messageId: `child-msg-${++communicationCounter}`,
+            outcome: "replied",
+            reply,
+            createdAt: Date.now(),
+          }).pipe(
+            Effect.tap(() => Effect.sync(() => pending.resume(Effect.succeed(reply)))),
+            Effect.asVoid,
+          );
+        }),
       interrupt: Effect.gen(function* () {
         // Drop queued prompts so interrupting cannot immediately start
         // another turn, then stop the active turn. A prompt may be mid-flight

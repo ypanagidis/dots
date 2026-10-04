@@ -112,6 +112,50 @@ function renderToolResultItem(
   );
 }
 
+function renderCommunicationItem(
+  theme: Theme,
+  item: Extract<TranscriptItem, { kind: "communication" }>,
+  width: number,
+  out: string[],
+) {
+  const message = item.message;
+  const outbound =
+    message.kind !== "reply" && message.kind !== "guidance";
+  const label =
+    message.kind === "guidance"
+      ? "↓ guidance from teamlead"
+      : message.kind === "question"
+        ? `↑ question to teamlead ${message.requestId ?? ""}`
+        : message.kind === "reply"
+          ? `↓ teamlead reply ${message.requestId ?? ""}`
+          : message.kind === "resolution"
+            ? `× teamlead question closed ${message.requestId ?? ""}`
+            : "↑ update to teamlead";
+  const prefix = outbound
+    ? theme.fg(
+        message.kind === "question"
+          ? "warning"
+          : message.kind === "resolution"
+            ? "muted"
+            : "accent",
+        `${label}: `,
+      )
+    : theme.fg("success", `${label}: `);
+  const wrapped = wrapTextWithAnsi(
+    sanitizeText(message.text),
+    Math.max(10, width - visibleWidth(prefix)),
+  );
+  for (let i = 0; i < wrapped.length; i++) {
+    out.push(
+      truncateToWidth(
+        (i === 0 ? prefix : " ".repeat(visibleWidth(prefix))) +
+          theme.fg("muted", wrapped[i]),
+        width,
+      ),
+    );
+  }
+}
+
 /** Render a subagent's conversation as plain lines, wrapped to `width`. */
 export function buildTranscriptLines(
   snap: SubagentSnapshot,
@@ -126,8 +170,10 @@ export function buildTranscriptLines(
       renderUserText(theme, item.text, width, out);
     } else if (item.kind === "assistant") {
       renderAssistantItem(theme, item, width, out);
-    } else {
+    } else if (item.kind === "toolResult") {
       renderToolResultItem(theme, item, width, out);
+    } else {
+      renderCommunicationItem(theme, item, width, out);
     }
     if (out.length > before) out.push("");
   }
