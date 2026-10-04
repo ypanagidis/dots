@@ -192,7 +192,9 @@ else
 fi
 
 if need_cmd nix-collect-garbage; then
-  nix-collect-garbage -d || true
+  # No -d for root: it would delete every old system generation, including
+  # the ones trim_nix_system_generations just kept.
+  nix-collect-garbage || true
   run_as_user "nix-collect-garbage -d"
 else
   warn "nix-collect-garbage not found; skipping Nix GC"

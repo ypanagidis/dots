@@ -1,5 +1,4 @@
 {
-  config,
   inputs,
   pkgs,
   lib,
@@ -7,8 +6,6 @@
 }:
 
 let
-  home = config.home.homeDirectory;
-
   # Discord's native Linux monitor capture imports niri's DMA-BUF stream with
   # Vulkan. The nixpkgs FHS wrapper sets the Vulkan ICD path but omits the
   # loader itself, so Discord falls back to SHM, which niri does not expose for
@@ -32,7 +29,7 @@ in
       discordWithVulkan
       slack
       telegram-desktop
-      libreoffice-fresh
+      libreoffice
       pavucontrol
       remmina
       high-tide

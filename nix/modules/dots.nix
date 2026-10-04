@@ -13,10 +13,8 @@ in
   # nix, the config content has one source of truth.
   _module.args.dotsLink = link;
 
-  # Only configs with no dedicated module belong here. terminals/tmux/nvim link
-  # to dots/ from their own modules (via dotsLink); zsh/btop remain nix-native
-  # for now — the dots zsh plugins are embedded git checkouts that a fresh
-  # clone would not include.
+  # Only configs with no dedicated module belong here. terminals/tmux/nvim/zsh/
+  # btop link to dots/ from their own modules (via dotsLink).
   # Context helper for the KDE Activities port of the niri contexts.
   home.file.".local/bin/kde-ctx".source = link "bin/kde-ctx";
 

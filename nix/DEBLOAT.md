@@ -29,7 +29,7 @@ By default, the script cleans:
 
 ## Usage
 
-Run from this repo root:
+Run from the `nix/` directory of this repo:
 
 ```bash
 sudo ./debloat-all.sh

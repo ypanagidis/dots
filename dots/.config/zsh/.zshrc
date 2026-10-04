@@ -30,63 +30,56 @@ setopt NOBEEP
 setopt NUMERIC_GLOB_SORT  # sort file10 after file9, not after file1
 
 # =========================================================
-# Smart directory navigation & lf
+# Completion
 # =========================================================
-#
-# LF_ICONS=$(cat ~/.config/lf/icons | tr '\n' ':')
-# export LF_ICONS
-#
-# # =========================================================
-# # Completion
-# # =========================================================
-#
-# # Load completion system
+
+# Load completion system
 autoload -Uz compinit
-#
-# # Initialize completion with cached metadata file
+
+# Initialize completion with cached metadata file
 compinit -d "$XDG_CACHE_HOME/zsh/zcompdump"
-#
-# # Enable interactive completion menu selection
+
+# Enable interactive completion menu selection
 zstyle ':completion:*' menu select
-#
-# # Make completion case-insensitive
-# # Example: "doc" can complete to "Documents"
+
+# Make completion case-insensitive
+# Example: "doc" can complete to "Documents"
 zstyle ':completion:*' matcher-list 'm:{a-z}={A-Za-z}'  # lowercase input matches upper and lower
-#
-# # =========================================================
-# # Fuzzy finder
-# # =========================================================
-#
-# # Linux / Arch / CachyOS
+
+# =========================================================
+# Fuzzy finder
+# =========================================================
+
+# Linux / Arch / CachyOS
 if [[ -f /usr/share/fzf/key-bindings.zsh ]]; then
   source /usr/share/fzf/key-bindings.zsh
   source /usr/share/fzf/completion.zsh
-# # macOS / Homebrew (Apple Silicon)
+# macOS / Homebrew (Apple Silicon)
 elif [[ -f /opt/homebrew/opt/fzf/shell/key-bindings.zsh ]]; then
   source /opt/homebrew/opt/fzf/shell/key-bindings.zsh
   source /opt/homebrew/opt/fzf/shell/completion.zsh
 fi
-#
-# # =========================================================
-# # Modular Config Files
-# # =========================================================
-#
-# # fzf configuration
+
+# =========================================================
+# Modular Config Files
+# =========================================================
+
+# fzf configuration
 source "$ZDOTDIR/fzf.zsh"
-#
-# # Aliases
+
+# Aliases
 source "$ZDOTDIR/aliases.zsh"
-#
-# # Custom keybindings
+
+# Custom keybindings
 source "$ZDOTDIR/bindings.zsh"
-#
-# # Plugins and plugin manager
+
+# Plugins and plugin manager
 source "$ZDOTDIR/plugins.zsh"
-#
-# # Node and package managers
+
+# Node and package managers
 source "$ZDOTDIR/node.zsh"
-#
-# # Prompt/theme
+
+# Prompt/theme
 source "$ZDOTDIR/prompt.zsh"
 
 # pnpm

@@ -27,29 +27,28 @@ custom-packages/flake.nix # Custom package overlay
 sudo nixos-rebuild switch --flake .#nixos
 ```
 
-## Manual Updates
+## Updates
 
-```bash
-./update-annoying.sh
-```
+`nix flake update` moves every input. The shell helpers in
+`modules/clis/shell/default.nix` do targeted bumps:
 
-Updates the pins that do not move cleanly with ordinary flake updates: Opencode,
-Helium, T3 Code, Oxc apps (`oxlint`/`oxfmt`), and TypeScript Go (`tsgo`).
-Opencode updates refresh the `sst/opencode` flake input. `tsgo` tracks
-`@typescript/native-preview@beta` and installs the matching
-`@typescript/native-preview-linux-x64` binary package. Cursor is intentionally
-excluded.
+- `re`: rebuild and switch.
+- `uai`: update the `llm-agents` input (claude-code, codex, opencode,
+  gemini-cli), then rebuild.
+- `uh`: update the `helium-flake` input, then rebuild.
+- `uc <version>`: bump the Cursor AppImage pin, then rebuild.
+
+T3 Code updates itself from its nightly feed, as on macOS. The pin in
+`modules/ides/t3/default.nix` only seeds a fresh install.
 
 ## Editor Tooling
 
-Neovim tools are configured in `modules/ides/nvim-config/` and installed through
-Home Manager's `programs.neovim.extraPackages`.
+Neovim and its tools are installed through `home.packages` in
+`modules/ides/nvim-config/neovim.nix`.
 
-- `oxlint` and `oxfmt` are pinned in `custom-packages/flake.nix` to Oxc's
-  upstream `apps_v*` GitHub release binaries. This avoids waiting for nixpkgs
-  updates and avoids local Rust/pnpm source builds.
-- `tsgo` is pinned in `custom-packages/flake.nix` to TypeScript's upstream npm
-  native preview binary. This avoids local Go module vendoring/builds.
+- `oxlint` and `oxfmt` come from nixpkgs.
+- `tsgo` is nixpkgs `typescript` (the TypeScript 7 Go port) exposed under that
+  name; `typescript_5` still provides `tsc`/`tsserver` for `ts_ls`.
 - Tailwind CSS LSP is enabled with custom root detection. The upstream
   nvim-lspconfig Tailwind v4 fallback can use `.git` as a root, which starts a
   monorepo-root server for packages that do not use Tailwind. The local config

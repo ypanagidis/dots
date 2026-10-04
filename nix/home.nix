@@ -1,6 +1,4 @@
 {
-  pkgs,
-  inputs,
   lib,
   ...
 }:
@@ -33,28 +31,28 @@
       Include ~/.config/sealant/ssh_config
     '';
     enableDefaultConfig = false;
-    matchBlocks = {
+    settings = {
       "*" = {
-        addKeysToAgent = "yes";
-        hashKnownHosts = true;
+        AddKeysToAgent = "yes";
+        HashKnownHosts = "yes";
       };
       github = {
-        hostname = "github.com";
-        user = "git";
-        identitiesOnly = true;
-        identityFile = "~/.ssh/id_ed25519";
+        HostName = "github.com";
+        User = "git";
+        IdentitiesOnly = "yes";
+        IdentityFile = "~/.ssh/id_ed25519";
       };
       "sbx-*" = {
-        hostname = "localhost";
-        port = 2222;
-        identitiesOnly = true;
-        identityFile = "~/.ssh/id_ed25519_github";
+        HostName = "localhost";
+        Port = 2222;
+        IdentitiesOnly = "yes";
+        IdentityFile = "~/.ssh/id_ed25519_github";
       };
       personal_macbook = {
-        hostname = "Yianniss-MacBook-Pro.local";
-        user = "yiannis";
-        identitiesOnly = true;
-        identityFile = "~/.ssh/id_ed25519";
+        HostName = "Yianniss-MacBook-Pro.local";
+        User = "yiannis";
+        IdentitiesOnly = "yes";
+        IdentityFile = "~/.ssh/id_ed25519";
       };
     };
   };

@@ -10,7 +10,7 @@ let
   mkt = pkgs.nix-vscode-extensions.vscode-marketplace;
   vsc = pkgs.vscode-extensions;
 
-  repoRoot = "${config.home.homeDirectory}/nixcfg";
+  repoRoot = "${config.home.homeDirectory}/Developer/Configs/nix";
   repoSettings = "${repoRoot}/modules/ides/vscode/settings.json";
   repoKeybindings = "${repoRoot}/modules/ides/vscode/keybindings.json";
   vscodePkg = pkgs.vscode;

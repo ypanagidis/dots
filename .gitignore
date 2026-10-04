@@ -1,9 +1,13 @@
 .DS_Store
 .lazy-lock.json
 lazy-lock.json
-.config/zsh/plugins/
+dots/.config/zsh/plugins/
 rust/niri-ctx/target/
-.config/zsh/.zcompdump*
+dots/.config/zsh/.zcompdump*
 # herdr runtime state (only config.toml is config)
 dots/.config/herdr/*
 !dots/.config/herdr/config.toml
+__pycache__/
+*.pyc
+# Claude Code writes claude.ai account skills here (via ~/.claude/skills)
+dots/.config/agents/skills/synced/
