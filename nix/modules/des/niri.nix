@@ -157,7 +157,7 @@ in
     bash_fallback = "${niriCtx}/libexec/niri-ctx/bash-fallback"
 
     [terminal]
-    program = "alacritty"
+    program = "ghostty"
   '';
 
   # Keep the v5 bar edge-to-edge, matching the previous shell. The clock sits

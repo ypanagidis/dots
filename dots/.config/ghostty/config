@@ -1,36 +1,16 @@
 font-family = MesloLGS Nerd Font Mono
-font-size = 15
+font-size = 14
 adjust-cell-height = 25%
 copy-on-select = clipboard
-background = #1b1b1d
-foreground = #d7d7d7
-cursor-color = #d7d7d7
-selection-background = #3f3f44
-selection-foreground = #ffffff
-palette = 0=#1b1b1d
-palette = 1=#ff5c57
-palette = 2=#5af078
-palette = 3=#ffd866
-palette = 4=#45c8ff
-palette = 5=#ff40ff
-palette = 6=#45c8ff
-palette = 7=#d7d7d7
-palette = 8=#5f6368
-palette = 9=#ff6b66
-palette = 10=#69ff8a
-palette = 11=#ffe680
-palette = 12=#5ad4ff
-palette = 13=#ff66ff
-palette = 14=#5ad4ff
-palette = 15=#ffffff
-background-opacity = 0.86
-background-opacity-cells = true
-background-blur = true
+theme = Ayu Mirage
+background-opacity = 1
+background-blur = false
 window-padding-x = 10
 window-padding-y = 8
 # No titlebar. Default (auto) means server-side decorations under KDE;
 # niri never drew them, which is why this was never needed before.
 window-decoration = none
+fullscreen = true
 
 # Let Herdr use Ctrl-Shift-J for next-agent navigation.
 keybind = ctrl+shift+j=unbind
