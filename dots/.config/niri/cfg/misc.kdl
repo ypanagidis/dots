@@ -3,7 +3,9 @@
 
     environment {
         ELECTRON_OZONE_PLATFORM_HINT "auto"
-        QT_QPA_PLATFORM "wayland"
+        // Fall back to XWayland for bundled Qt builds without the Wayland
+        // plugin (the Android emulator aborts on a bare "wayland").
+        QT_QPA_PLATFORM "wayland;xcb"
         QT_QPA_PLATFORMTHEME "gtk3"
         QT_WAYLAND_DISABLE_WINDOWDECORATION "1"
         XDG_CURRENT_DESKTOP "niri"

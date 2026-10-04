@@ -66,6 +66,17 @@
         open-on-workspace "Sealant"
     }
 
+    // Android emulator (standalone, XWayland). Its window has a fixed skin
+    // aspect ratio; tiling forces a size, the emulator rescales to fit and
+    // requests another, and the two loop. Floating lets it keep its size.
+    // App ID captured from `niri msg --json windows` on 2026-09-30: "Emulator"
+    // (title "Android Emulator - <avd>:<port>"). The title is set after the
+    // XWayland window maps, so a title match misses the open-time rule.
+    window-rule {
+        match app-id=r#"^Emulator$"#
+        open-floating true
+    }
+
      // if you use steam you will probably like these
     window-rule {
         match app-id=r#"^steam$"#

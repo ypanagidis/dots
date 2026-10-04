@@ -6,5 +6,6 @@
     ./nvim-config/neovim.nix
     ./datagrip/datagrip.nix
     ./intellij
+    ./android-studio
   ];
 }
