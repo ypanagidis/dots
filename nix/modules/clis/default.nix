@@ -65,6 +65,7 @@ in
     kubernetes-helm
     minikubeOnly
     doppler
+    awscli2
     # Secrets-at-rest for the Talos/infra repo: sops encrypts values in place,
     # age is its keypair backend (~/.config/sops/age/keys.txt).
     sops

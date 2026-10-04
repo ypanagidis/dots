@@ -30,12 +30,16 @@
     tree-sitter
 
     # LSP servers
-    typescript
+    # Classic TypeScript 5 owns `tsc`/`tsserver` (ts_ls compatibility).
+    typescript_5
     typescript-language-server
-    # TypeScript 7 from nixpkgs; provides both tsgo and tsc. lowPrio so the
-    # classic typescript package keeps owning `tsc` (ts_ls compatibility)
-    # while `tsgo` comes from here — same split the old binary pin had.
-    (lib.lowPrio typescript-go)
+    # nixpkgs `typescript` is now TypeScript 7 (the Go port) and only ships
+    # `tsc`. Expose it as `tsgo`, which lsp.lua falls back to when a project
+    # has no local node_modules/.bin/tsgo.
+    (runCommand "tsgo" { } ''
+      mkdir -p $out/bin
+      ln -s ${lib.getExe' typescript "tsc"} $out/bin/tsgo
+    '')
     oxlint
     tailwindcss-language-server
     gopls

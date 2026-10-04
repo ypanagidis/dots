@@ -79,6 +79,8 @@
     4096
     4000
     3000
+    3102
+    3773 # T3
     # mend
     3105
   ];
@@ -105,7 +107,10 @@
 
   # Tailscale has no official Linux GUI; Trayscale is the usual GTK tray app.
   environment.systemPackages = [ pkgs.trayscale ];
-  networking.firewall.trustedInterfaces = [ "virbr0" "tailscale0" ];
+  networking.firewall.trustedInterfaces = [
+    "virbr0"
+    "tailscale0"
+  ];
 
   time.timeZone = "Europe/Athens";
   i18n.defaultLocale = "en_US.UTF-8";

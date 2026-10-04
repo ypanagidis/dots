@@ -148,124 +148,19 @@ let
 
       replace_once(
           "module-src/btmtk.h",
-          "#define FIRMWARE_MT7925\t\t\"mediatek/mt7925/BT_RAM_CODE_MT7925_1_1_hdr.bin\"",
-          "#define FIRMWARE_MT7925\t\t\"mediatek/mt7925/BT_RAM_CODE_MT7925_1_1_hdr.bin\"\n"
-          "#define FIRMWARE_MT7927\t\t\"mediatek/mt7927/BT_RAM_CODE_MT6639_2_1_hdr.bin\"",
-      )
-
-      replace_once(
-          "module-src/btmtk.h",
           "\tBTMTK_ISOPKT_RUNNING,\n};",
           "\tBTMTK_ISOPKT_RUNNING,\n"
           "\tBTMTK_FIRMWARE_DL_RETRY,\n};",
       )
 
-      replace_once(
-          "module-src/btmtk.h",
-          "int btmtk_setup_firmware_79xx(struct hci_dev *hdev, const char *fwname,\n"
-          "\t\t\t      wmt_cmd_sync_func_t wmt_cmd_sync);",
-          "int btmtk_setup_firmware_79xx(struct hci_dev *hdev, const char *fwname,\n"
-          "\t\t\t      wmt_cmd_sync_func_t wmt_cmd_sync,\n"
-          "\t\t\t      u32 dev_id);",
-      )
-
-      replace_once(
-          "module-src/btmtk.h",
-          "static inline int btmtk_setup_firmware_79xx(struct hci_dev *hdev,\n"
-          "\t\t\t\t\t    const char *fwname,\n"
-          "\t\t\t\t\t    wmt_cmd_sync_func_t wmt_cmd_sync)\n"
-          "{\n"
-          "\treturn -EOPNOTSUPP;\n"
-          "}",
-          "static inline int btmtk_setup_firmware_79xx(struct hci_dev *hdev,\n"
-          "\t\t\t\t\t    const char *fwname,\n"
-          "\t\t\t\t\t    wmt_cmd_sync_func_t wmt_cmd_sync,\n"
-          "\t\t\t\t\t    u32 dev_id)\n"
-          "{\n"
-          "\treturn -EOPNOTSUPP;\n"
-          "}",
-      )
-
+      # Since 6.18.54 a truncated FUNC_CTRL ack takes its result from the WMT
+      # header flag; the MT6639 still needs it treated as ON_DONE regardless.
       replace_once(
           "module-src/btmtk.c",
-          "#define MTK_ISO_THRESHOLD\t264",
-          "#define MTK_ISO_THRESHOLD\t264\n\n"
-          "static const struct {\n"
-          "\tu16 vendor;\n"
-          "\tu16 product;\n"
-          "} btmtk_mt6639_devs[] = {\n"
-          "\t{ 0x0489, 0xe13a },\n"
-          "\t{ 0x0489, 0xe0fa },\n"
-          "\t{ 0x0489, 0xe10f },\n"
-          "\t{ 0x0489, 0xe110 },\n"
-          "\t{ 0x0489, 0xe116 },\n"
-          "\t{ 0x13d3, 0x3588 },\n"
-          "};",
-      )
-
-      replace_once(
-          "module-src/btmtk.c",
-          "\tif (dev_id == 0x7925)",
-          "\tif (dev_id == 0x6639)\n"
-          "\t\tsnprintf(buf, size,\n"
-          "\t\t\t \"mediatek/mt7927/BT_RAM_CODE_MT%04x_2_%x_hdr.bin\",\n"
-          "\t\t\t dev_id & 0xffff, (fw_ver & 0xff) + 1);\n"
-          "\telse if (dev_id == 0x7925)",
-      )
-
-      replace_once(
-          "module-src/btmtk.c",
-          "int btmtk_setup_firmware_79xx(struct hci_dev *hdev, const char *fwname,\n"
-          "\t\t\t      wmt_cmd_sync_func_t wmt_cmd_sync)",
-          "int btmtk_setup_firmware_79xx(struct hci_dev *hdev, const char *fwname,\n"
-          "\t\t\t      wmt_cmd_sync_func_t wmt_cmd_sync,\n"
-          "\t\t\t      u32 dev_id)",
-      )
-
-      replace_once(
-          "module-src/btmtk.c",
-          "\t\tsection_offset = le32_to_cpu(sectionmap->secoffset);\n"
-          "\t\tdl_size = le32_to_cpu(sectionmap->bin_info_spec.dlsize);\n\n"
-          "\t\tif (dl_size > 0) {",
-          "\t\tsection_offset = le32_to_cpu(sectionmap->secoffset);\n"
-          "\t\tdl_size = le32_to_cpu(sectionmap->bin_info_spec.dlsize);\n\n"
-          "\t\tif (dev_id == 0x6639 && dl_size > 0 &&\n"
-          "\t\t    (le32_to_cpu(sectionmap->bin_info_spec.dlmodecrctype) & 0xff) != 0x01)\n"
-          "\t\t\tcontinue;\n\n"
-          "\t\tif (dl_size > 0) {",
-      )
-
-      replace_once(
-          "module-src/btmtk.c",
-          "\t} else if (dev_id == 0x7925) {",
-          "\t} else if (dev_id == 0x7925 || dev_id == 0x6639) {",
-      )
-
-      # Kernel 6.18 turned the truncated-FUNC_CTRL-event path from a hard
-      # -EINVAL into ON_UNDONE; the MT6639 still needs it treated as ON_DONE.
-      replace_once(
-          "module-src/btmtk.c",
-          "\t\tif (!skb_pull_data(data->evt_skb,\n"
-          "\t\t\t\t   sizeof(wmt_evt_funcc->status))) {\n"
-          "\t\t\tstatus = BTMTK_WMT_ON_UNDONE;\n"
-          "\t\t\tbreak;\n"
-          "\t\t}",
-          "\t\tif (!skb_pull_data(data->evt_skb,\n"
-          "\t\t\t\t   sizeof(wmt_evt_funcc->status))) {\n"
-          "\t\t\tif (data->dev_id == 0x6639)\n"
-          "\t\t\t\tstatus = BTMTK_WMT_ON_DONE;\n"
-          "\t\t\telse\n"
-          "\t\t\t\tstatus = BTMTK_WMT_ON_UNDONE;\n"
-          "\t\t\tbreak;\n"
-          "\t\t}",
-      )
-
-      replace_once(
-          "module-src/btmtk.c",
-          "\tif (err < 0 || !val)\n"
-          "\t\tbt_dev_err(hdev, \"Can't get device id, subsys reset fail.\");",
-          "\tif (err < 0 || (!val && dev_id != 0x6639))\n"
-          "\t\tbt_dev_err(hdev, \"Can't get device id, subsys reset fail.\");",
+          "\t\t\tstatus = wmt_evt->whdr.flag ? BTMTK_WMT_ON_UNDONE :\n"
+          "\t\t\t\t\t\t       BTMTK_WMT_ON_DONE;",
+          "\t\t\tstatus = (wmt_evt->whdr.flag && data->dev_id != 0x6639) ?\n"
+          "\t\t\t\t BTMTK_WMT_ON_UNDONE : BTMTK_WMT_ON_DONE;",
       )
 
       replace_once(
@@ -277,39 +172,6 @@ let
           "\t\tmsleep(3000);\n"
           "\telse\n"
           "\t\tusleep_range(100000, 120000);",
-      )
-
-      replace_once(
-          "module-src/btmtk.c",
-          "\tbtmtk_data->dev_id = dev_id;",
-          "\tif (!dev_id) {\n"
-          "\t\tu16 vid = le16_to_cpu(btmtk_data->udev->descriptor.idVendor);\n"
-          "\t\tu16 pid = le16_to_cpu(btmtk_data->udev->descriptor.idProduct);\n"
-          "\t\tint i;\n\n"
-          "\t\tfor (i = 0; i < ARRAY_SIZE(btmtk_mt6639_devs); i++) {\n"
-          "\t\t\tif (vid == btmtk_mt6639_devs[i].vendor &&\n"
-          "\t\t\t    pid == btmtk_mt6639_devs[i].product) {\n"
-          "\t\t\t\tdev_id = 0x6639;\n"
-          "\t\t\t\tbreak;\n"
-          "\t\t\t}\n"
-          "\t\t}\n\n"
-          "\t\tif (dev_id)\n"
-          "\t\t\tbt_dev_info(hdev, \"MT6639: CHIPID=0x0000 with VID=%04x PID=%04x, using 0x6639\",\n"
-          "\t\t\t\t    vid, pid);\n"
-          "\t}\n\n"
-          "\tbtmtk_data->dev_id = dev_id;",
-      )
-
-      replace_once(
-          "module-src/btmtk.c",
-          "\tcase 0x7922:\n\tcase 0x7925:\n\tcase 0x7961:",
-          "\tcase 0x7922:\n\tcase 0x7925:\n\tcase 0x6639:\n\tcase 0x7961:",
-      )
-
-      replace_once(
-          "module-src/btmtk.c",
-          "btmtk_usb_hci_wmt_sync);",
-          "btmtk_usb_hci_wmt_sync, dev_id);",
       )
 
       replace_once(
@@ -344,12 +206,6 @@ let
           "\t\t\t       (intf->num_altsetting > 1) ? 1 : 0);",
       )
 
-      replace_once(
-          "module-src/btmtk.c",
-          "MODULE_FIRMWARE(FIRMWARE_MT7925);",
-          "MODULE_FIRMWARE(FIRMWARE_MT7925);\n"
-          "MODULE_FIRMWARE(FIRMWARE_MT7927);",
-      )
       PY
 
       cat > module-src/Makefile <<'EOF'
