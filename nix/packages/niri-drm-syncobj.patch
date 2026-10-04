@@ -1,0 +1,421 @@
+diff --git a/src/backend/tty.rs b/src/backend/tty.rs
+index 5368c7e..d24d7f0 100644
+--- a/src/backend/tty.rs
++++ b/src/backend/tty.rs
+@@ -861,6 +861,10 @@ impl Tty {
+                 );
+             assert!(self.dmabuf_global.replace(dmabuf_global).is_none());
+ 
++            // DRM syncobj applies to dmabuf-backed buffers, so expose it alongside
++            // dmabuf using the same primary DRM import device.
++            niri.update_drm_syncobj_state(drm.device_fd().clone());
++
+             // Update the dmabuf feedbacks for all surfaces.
+             for (node, device) in self.devices.iter_mut() {
+                 for surface in device.surfaces.values_mut() {
+@@ -1176,6 +1180,8 @@ impl Tty {
+ 
+                 // Disable and destroy the dmabuf global.
+                 if let Some(global) = self.dmabuf_global.take() {
++                    niri.disable_drm_syncobj_state();
++
+                     niri.dmabuf_state
+                         .disable_global::<State>(&niri.display_handle, &global);
+                     niri.event_loop
+diff --git a/src/handlers/compositor.rs b/src/handlers/compositor.rs
+index f38b293..36b2bb0 100644
+--- a/src/handlers/compositor.rs
++++ b/src/handlers/compositor.rs
+@@ -3,21 +3,20 @@ use std::collections::hash_map::Entry;
+ use niri_ipc::PositionChange;
+ use smithay::backend::renderer::utils::on_commit_buffer_handler;
+ use smithay::input::pointer::{CursorImageStatus, CursorImageSurfaceData};
+-use smithay::reexports::calloop::Interest;
+ use smithay::reexports::wayland_server::protocol::wl_buffer;
+ use smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
+ use smithay::reexports::wayland_server::{Client, Resource};
+ use smithay::wayland::buffer::BufferHandler;
+ use smithay::wayland::compositor::{
+-    add_blocker, add_pre_commit_hook, get_parent, is_sync_subsurface, remove_pre_commit_hook,
+-    with_states, BufferAssignment, CompositorClientState, CompositorHandler, CompositorState,
+-    SurfaceAttributes,
++    add_pre_commit_hook, get_parent, is_sync_subsurface, remove_pre_commit_hook, with_states,
++    BufferAssignment, CompositorClientState, CompositorHandler, CompositorState, SurfaceAttributes,
+ };
+ use smithay::wayland::dmabuf::get_dmabuf;
+ use smithay::wayland::shell::xdg::ToplevelCachedState;
+ use smithay::wayland::shm::{ShmHandler, ShmState};
+ use smithay::{delegate_compositor, delegate_shm};
+ 
++use super::dmabuf_readiness::add_dmabuf_readiness_blocker;
+ use super::xdg_shell::add_mapped_toplevel_pre_commit_hook;
+ use crate::handlers::XDG_ACTIVATION_TOKEN_TIMEOUT;
+ use crate::layout::{ActivateWindow, AddWindowTarget, LayoutElement as _};
+@@ -546,27 +545,7 @@ impl State {
+                         _ => None,
+                     })
+             });
+-            if let Some(dmabuf) = maybe_dmabuf {
+-                if let Ok((blocker, source)) = dmabuf.generate_blocker(Interest::READ) {
+-                    if let Some(client) = surface.client() {
+-                        let res =
+-                            state
+-                                .niri
+-                                .event_loop
+-                                .insert_source(source, move |_, _, state| {
+-                                    let display_handle = state.niri.display_handle.clone();
+-                                    state
+-                                        .client_compositor_state(&client)
+-                                        .blocker_cleared(state, &display_handle);
+-                                    Ok(())
+-                                });
+-                        if res.is_ok() {
+-                            add_blocker(surface, blocker);
+-                            trace!("added default dmabuf blocker");
+-                        }
+-                    }
+-                }
+-            }
++            add_dmabuf_readiness_blocker(&state.niri.event_loop, surface, maybe_dmabuf);
+         });
+ 
+         let s = surface.clone();
+diff --git a/src/handlers/dmabuf_readiness.rs b/src/handlers/dmabuf_readiness.rs
+new file mode 100644
+index 0000000..f5512f6
+--- /dev/null
++++ b/src/handlers/dmabuf_readiness.rs
+@@ -0,0 +1,103 @@
++use std::io;
++
++use calloop::{EventSource, Interest, LoopHandle};
++use smithay::backend::allocator::dmabuf::Dmabuf;
++use smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
++use smithay::reexports::wayland_server::{Client, Resource};
++use smithay::wayland::compositor::{add_blocker, with_states, Blocker, CompositorHandler as _};
++use smithay::wayland::drm_syncobj::DrmSyncobjCachedState;
++
++use crate::niri::State;
++
++pub(super) fn add_dmabuf_readiness_blocker(
++    event_loop: &LoopHandle<'static, State>,
++    surface: &WlSurface,
++    dmabuf: Option<Dmabuf>,
++) {
++    add_dmabuf_readiness_blocker_with_ready_callback(event_loop, surface, dmabuf, |_| {});
++}
++
++pub(super) fn add_dmabuf_readiness_blocker_with_ready_callback<F>(
++    event_loop: &LoopHandle<'static, State>,
++    surface: &WlSurface,
++    dmabuf: Option<Dmabuf>,
++    on_blocker_ready: F,
++) where
++    F: FnMut(&mut State) + 'static,
++{
++    let Some(client) = surface.client() else {
++        return;
++    };
++    let Some(dmabuf) = dmabuf else {
++        return;
++    };
++
++    let acquire_point = with_states(surface, |states| {
++        states
++            .cached_state
++            .get::<DrmSyncobjCachedState>()
++            .pending()
++            .acquire_point
++            .clone()
++    });
++
++    if let Some(acquire_point) = acquire_point {
++        if let Ok((blocker, source)) = acquire_point.generate_blocker() {
++            if add_blocker_with_ready_callback(
++                event_loop,
++                surface,
++                client,
++                blocker,
++                source,
++                on_blocker_ready,
++            ) {
++                trace!("added DRM syncobj blocker");
++            }
++            return;
++        }
++    }
++
++    let Ok((blocker, source)) = dmabuf.generate_blocker(Interest::READ) else {
++        return;
++    };
++
++    if add_blocker_with_ready_callback(
++        event_loop,
++        surface,
++        client,
++        blocker,
++        source,
++        on_blocker_ready,
++    ) {
++        trace!("added dmabuf blocker");
++    }
++}
++
++fn add_blocker_with_ready_callback<S, F>(
++    event_loop: &LoopHandle<'static, State>,
++    surface: &WlSurface,
++    client: Client,
++    blocker: impl Blocker + Send + 'static,
++    source: S,
++    mut on_blocker_ready: F,
++) -> bool
++where
++    S: EventSource<Event = (), Ret = Result<(), io::Error>> + 'static,
++    F: FnMut(&mut State) + 'static,
++{
++    let Ok(_) = event_loop.insert_source(source, move |_, _, state| {
++        on_blocker_ready(state);
++
++        let display_handle = state.niri.display_handle.clone();
++        state
++            .client_compositor_state(&client)
++            .blocker_cleared(state, &display_handle);
++
++        Ok(())
++    }) else {
++        return false;
++    };
++
++    add_blocker(surface, blocker);
++    true
++}
+diff --git a/src/handlers/mod.rs b/src/handlers/mod.rs
+index 3532078..f95cd9c 100644
+--- a/src/handlers/mod.rs
++++ b/src/handlers/mod.rs
+@@ -1,5 +1,6 @@
+ pub mod background_effect;
+ mod compositor;
++mod dmabuf_readiness;
+ mod layer_shell;
+ mod xdg_shell;
+ 
+@@ -29,6 +30,7 @@ use smithay::wayland::dmabuf::{DmabufGlobal, DmabufHandler, DmabufState, ImportN
+ use smithay::wayland::drm_lease::{
+     DrmLease, DrmLeaseBuilder, DrmLeaseHandler, DrmLeaseRequest, DrmLeaseState, LeaseRejected,
+ };
++use smithay::wayland::drm_syncobj::{DrmSyncobjHandler, DrmSyncobjState};
+ use smithay::wayland::fractional_scale::FractionalScaleHandler;
+ use smithay::wayland::idle_inhibit::IdleInhibitHandler;
+ use smithay::wayland::idle_notify::{IdleNotifierHandler, IdleNotifierState};
+@@ -63,7 +65,7 @@ use smithay::wayland::xdg_activation::{
+ };
+ use smithay::{
+     delegate_cursor_shape, delegate_data_control, delegate_data_device, delegate_dmabuf,
+-    delegate_drm_lease, delegate_ext_data_control, delegate_fractional_scale,
++    delegate_drm_lease, delegate_drm_syncobj, delegate_ext_data_control, delegate_fractional_scale,
+     delegate_idle_inhibit, delegate_idle_notify, delegate_input_method_manager,
+     delegate_keyboard_shortcuts_inhibit, delegate_output, delegate_pointer_constraints,
+     delegate_pointer_gestures, delegate_presentation, delegate_primary_selection,
+@@ -456,6 +458,13 @@ impl DmabufHandler for State {
+ }
+ delegate_dmabuf!(State);
+ 
++impl DrmSyncobjHandler for State {
++    fn drm_syncobj_state(&mut self) -> Option<&mut DrmSyncobjState> {
++        self.niri.drm_syncobj_state.as_mut()
++    }
++}
++delegate_drm_syncobj!(State);
++
+ impl SessionLockHandler for State {
+     fn lock_state(&mut self) -> &mut SessionLockManagerState {
+         &mut self.niri.session_lock_state
+diff --git a/src/handlers/xdg_shell.rs b/src/handlers/xdg_shell.rs
+index 38440c9..51d65f0 100644
+--- a/src/handlers/xdg_shell.rs
++++ b/src/handlers/xdg_shell.rs
+@@ -1,6 +1,5 @@
+ use std::cell::Cell;
+ 
+-use calloop::Interest;
+ use niri_config::PresetSize;
+ use smithay::desktop::{
+     find_popup_root_surface, get_popup_toplevel_coords, layer_map_for_output, utils, LayerSurface,
+@@ -19,8 +18,7 @@ use smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
+ use smithay::reexports::wayland_server::{self, Resource, WEnum};
+ use smithay::utils::{Logical, Rectangle, Serial};
+ use smithay::wayland::compositor::{
+-    add_blocker, add_pre_commit_hook, with_states, BufferAssignment, CompositorHandler as _,
+-    HookId, SurfaceAttributes,
++    add_blocker, add_pre_commit_hook, with_states, BufferAssignment, HookId, SurfaceAttributes,
+ };
+ use smithay::wayland::dmabuf::get_dmabuf;
+ use smithay::wayland::input_method::InputMethodSeat;
+@@ -37,6 +35,7 @@ use smithay::{
+ };
+ use tracing::field::Empty;
+ 
++use super::dmabuf_readiness::add_dmabuf_readiness_blocker_with_ready_callback;
+ use crate::input::move_grab::MoveGrab;
+ use crate::input::resize_grab::ResizeGrab;
+ use crate::input::touch_resize_grab::TouchResizeGrab;
+@@ -1484,16 +1483,17 @@ pub fn add_mapped_toplevel_pre_commit_hook(toplevel: &ToplevelSurface) -> HookId
+                 // Transaction can be already completed if it ran past the deadline.
+                 let disable = state.niri.config.borrow().debug.disable_transactions;
+                 if !transaction.is_completed() && !disable {
+-                    // Register the deadline even if this is the last pending, since dmabuf
+-                    // rendering can still run over the deadline.
++                    // Register the deadline even if this is the last pending participant: the
++                    // dmabuf readiness blocker can keep the transaction alive past the deadline.
+                     transaction.register_deadline_timer(&state.niri.event_loop);
+ 
+                     let is_last = transaction.is_last();
+ 
+                     // If this is the last transaction, we don't need to add a separate
+-                    // notification, because the transaction will complete in our dmabuf blocker
+-                    // callback, which already calls blocker_cleared(), or by the end of this
+-                    // function, in which case there would be no blocker in the first place.
++                    // notification, because the transaction will complete in our dmabuf readiness
++                    // blocker callback, which already calls blocker_cleared(), or by the end of
++                    // this function, in which case there would be no blocker in
++                    // the first place.
+                     if !is_last {
+                         // Waiting for some other surface; register a notification and add a
+                         // transaction blocker.
+@@ -1507,8 +1507,8 @@ pub fn add_mapped_toplevel_pre_commit_hook(toplevel: &ToplevelSurface) -> HookId
+                     }
+ 
+                     // Delay dropping (and completing) the transaction until the dmabuf is ready.
+-                    // If there's no dmabuf, this will be dropped by the end of this pre-commit
+-                    // hook.
++                    // If there's no dmabuf readiness blocker, this will be dropped by the end of
++                    // this pre-commit hook.
+                     transaction_for_dmabuf = Some(transaction);
+                 }
+             }
+@@ -1518,30 +1518,15 @@ pub fn add_mapped_toplevel_pre_commit_hook(toplevel: &ToplevelSurface) -> HookId
+             error!("commit on a mapped surface without a configured serial");
+         };
+ 
+-        if let Some((blocker, source)) =
+-            dmabuf.and_then(|dmabuf| dmabuf.generate_blocker(Interest::READ).ok())
+-        {
+-            if let Some(client) = surface.client() {
+-                let res = state
+-                    .niri
+-                    .event_loop
+-                    .insert_source(source, move |_, _, state| {
+-                        // This surface is now ready for the transaction.
+-                        drop(transaction_for_dmabuf.take());
+-
+-                        let display_handle = state.niri.display_handle.clone();
+-                        state
+-                            .client_compositor_state(&client)
+-                            .blocker_cleared(state, &display_handle);
+-
+-                        Ok(())
+-                    });
+-                if res.is_ok() {
+-                    add_blocker(surface, blocker);
+-                    trace!("added dmabuf blocker");
+-                }
+-            }
+-        }
++        add_dmabuf_readiness_blocker_with_ready_callback(
++            &state.niri.event_loop,
++            surface,
++            dmabuf,
++            move |_| {
++                // This dmabuf is now ready for the transaction.
++                drop(transaction_for_dmabuf.take());
++            },
++        );
+ 
+         let window = mapped.window.clone();
+         if got_unmapped {
+diff --git a/src/niri.rs b/src/niri.rs
+index ec40e01..32e6a95 100644
+--- a/src/niri.rs
++++ b/src/niri.rs
+@@ -19,6 +19,7 @@ use niri_config::{
+     WorkspaceReference, Xkb,
+ };
+ use smithay::backend::allocator::Fourcc;
++use smithay::backend::drm::DrmDeviceFd;
+ use smithay::backend::input::Keycode;
+ use smithay::backend::renderer::damage::OutputDamageTracker;
+ use smithay::backend::renderer::element::memory::MemoryRenderBufferRenderElement;
+@@ -78,6 +79,7 @@ use smithay::wayland::compositor::{
+ };
+ use smithay::wayland::cursor_shape::CursorShapeManagerState;
+ use smithay::wayland::dmabuf::DmabufState;
++use smithay::wayland::drm_syncobj::{supports_syncobj_eventfd, DrmSyncobjState};
+ use smithay::wayland::fractional_scale::FractionalScaleManagerState;
+ use smithay::wayland::idle_inhibit::IdleInhibitManagerState;
+ use smithay::wayland::idle_notify::IdleNotifierState;
+@@ -287,6 +289,7 @@ pub struct Niri {
+     pub shm_state: ShmState,
+     pub output_manager_state: OutputManagerState,
+     pub dmabuf_state: DmabufState,
++    pub drm_syncobj_state: Option<DrmSyncobjState>,
+     pub fractional_scale_manager_state: FractionalScaleManagerState,
+     pub seat_state: SeatState<State>,
+     pub tablet_state: TabletManagerState,
+@@ -2536,6 +2539,7 @@ impl Niri {
+             shm_state,
+             output_manager_state,
+             dmabuf_state,
++            drm_syncobj_state: None,
+             fractional_scale_manager_state,
+             seat_state,
+             tablet_state,
+@@ -4922,6 +4926,48 @@ impl Niri {
+         }
+     }
+ 
++    pub fn update_drm_syncobj_state(&mut self, import_device: DrmDeviceFd) {
++        if !supports_syncobj_eventfd(&import_device) {
++            debug!("not exposing DRM syncobj: DRM device lacks syncobj eventfd support");
++            self.disable_drm_syncobj_state();
++            return;
++        }
++
++        if let Some(state) = &mut self.drm_syncobj_state {
++            state.update_device(import_device);
++            debug!("updated DRM syncobj import device");
++        } else {
++            self.drm_syncobj_state = Some(DrmSyncobjState::new::<State>(
++                &self.display_handle,
++                import_device,
++            ));
++            debug!("exposing DRM syncobj protocol");
++        }
++    }
++
++    pub fn disable_drm_syncobj_state(&mut self) {
++        let Some(state) = self.drm_syncobj_state.take() else {
++            return;
++        };
++
++        // Keep the disabled global around briefly so clients can observe its removal.
++        let global = state.into_global();
++        self.display_handle.disable_global::<State>(global.clone());
++        self.event_loop
++            .insert_source(
++                Timer::from_duration(Duration::from_secs(10)),
++                move |_, _, state| {
++                    state
++                        .niri
++                        .display_handle
++                        .remove_global::<State>(global.clone());
++                    TimeoutAction::Drop
++                },
++            )
++            .unwrap();
++        debug!("disabled DRM syncobj protocol");
++    }
++
+     pub fn send_dmabuf_feedbacks(
+         &self,
+         output: &Output,

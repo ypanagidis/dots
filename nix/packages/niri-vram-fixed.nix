@@ -20,7 +20,12 @@ niri.overrideAttrs (oldAttrs: {
     hash = "sha256-9+BM0sEquTI/CzAO7ytl1iUFKJSn4U/X9g1v5MYNw1Y=";
   };
 
+  # Backport of niri PR #3956 (linux-drm-syncobj-v1, unmerged as of 2026-09).
+  # Without explicit sync, NVIDIA shows native-Wayland Chromium frames before
+  # the GPU finishes them: black/missing tiles on the 5K scale-2 output.
+  patches = (oldAttrs.patches or [ ]) ++ [ ./niri-drm-syncobj.patch ];
+
   env = (oldAttrs.env or { }) // {
-    NIRI_BUILD_COMMIT = "Nixpkgs+Smithay-VRAM-fixes";
+    NIRI_BUILD_COMMIT = "Nixpkgs+Smithay-VRAM-fixes+drm-syncobj";
   };
 })
