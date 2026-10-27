@@ -18,7 +18,7 @@ When the boundary and application shapes have the same meaning and invariants, p
 unknown -> CreateUserInput
 ```
 
-A boundary schema owns its protocol or persistence representation. Derive that representation's type from the schema, keep it inside the owning boundary, and translate it into an application or domain type before calling inner code. When an Effect Schema directly produces the final branded domain type, derive that type from the Schema without an intermediate representation.
+A boundary schema owns its protocol or persistence representation. Derive that representation's type from the schema, keep it inside the owning boundary, and translate it into an application or domain type before calling inner code. When a schema directly produces the final branded domain type, derive that type from the schema without an intermediate representation.
 
 ## Parser names
 
@@ -36,10 +36,9 @@ Functions that refine untrusted or less-structured input are parsers named `pars
 Use schema libraries as boundary parsers. Choose, in order:
 
 1. the repository's established schema library;
-2. Effect Schema in Effect codebases;
-3. Standard Schema compatibility for generic helpers;
-4. Zod 4 otherwise;
-5. a hand-written smart constructor/parser when it is clearer for a small domain type.
+2. Standard Schema compatibility for generic helpers;
+3. Zod 4 otherwise;
+4. a hand-written smart constructor/parser when it is clearer for a small domain type.
 
 Represent parsing failures with typed custom errors.
 

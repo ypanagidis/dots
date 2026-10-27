@@ -16,7 +16,6 @@ Prefer tests by confidence:
 Module mocking with `vi.mock` or `jest.mock` is forbidden. Replace behavior through real services and implementations:
 
 - constructor-injected interfaces/classes;
-- Effect services/Layers;
 - local database substitutes such as SQLite;
 - faithful in-memory implementations;
 - fake external implementations when needed.
@@ -35,7 +34,7 @@ A spy assertion is appropriate only when the interaction is itself the observabl
 
 Assess property-based testing for every changed invariant, transition, normalization, equivalence, ordering, idempotence, or roundtrip. Add property tests when generated inputs cover meaningful cases beyond a short example list. Apply this assessment especially to parsers, smart constructors, branded/refined types, state machines, serialization, and lawful combinators.
 
-Use `fast-check` in normal TypeScript projects. In Effect projects, prefer Effect's FastCheck integration and derive arbitraries from owning Schemas when available.
+Use `fast-check`, and derive arbitraries from the owning schemas when available.
 
 Keep reusable arbitraries beside the domain module they support. Add a shared test-data entrypoint only when multiple consumers need one:
 

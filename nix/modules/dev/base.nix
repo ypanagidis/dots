@@ -13,6 +13,7 @@
     pnpm
     nodejs
     python3
+    uv
     bun
     (maven.override { jdk_headless = pkgs.jdk21; })
     httpie

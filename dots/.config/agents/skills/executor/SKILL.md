@@ -1,6 +1,6 @@
 ---
 name: executor
-description: Use the local Executor integration gateway from Pi to discover and call external services, especially Figma and Linear. Trigger for service reads or writes routed through Executor, connection-aware account selection, gateway approvals, or Executor/Pi integration troubleshooting.
+description: Use the Executor integration gateway from Pi to discover and call external services, especially Figma and Linear. Trigger for service reads or writes routed through Executor, connection-aware account selection, gateway approvals, or Executor/Pi integration troubleshooting.
 ---
 
 # Executor
@@ -42,6 +42,8 @@ Respect Executor's allow, approval, and block policies. If a call pauses, show
 the approval URL or instructions and resume the returned execution instead of
 starting the mutation again.
 
-For connection failures, check `/mcp` in Pi, then run
-`systemctl --user status executor`. Use `executor open` when integrations,
-OAuth connections, or policies need configuration.
+For connection failures, check `/mcp` in Pi, then
+`curl -s https://executor.tailc79e49.ts.net/api/health`. Executor runs on
+mendbox (CT 170); `systemctl status executor` there shows the service. Use
+`executor open` when integrations, OAuth connections, or policies need
+configuration.

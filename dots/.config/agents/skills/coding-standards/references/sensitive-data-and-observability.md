@@ -14,7 +14,7 @@ Annotate diagnostics with structured fields such as:
 
 Treat personal data as private by default. Record only the minimum fields explicitly allowed by repository policy or established convention, after applying any required minimization or sanitization.
 
-Represent tokens, API keys, passwords, raw credentials, and other secrets with a `Redacted<T>` wrapper. Use Effect's `Redacted.Redacted` in Effect codebases or a local shared `Redacted<T>` wrapper elsewhere. Wrap these values at the boundary, preserve the wrapper through application code, and unwrap only in the module performing the final I/O operation that requires the raw value.
+Represent tokens, API keys, passwords, raw credentials, and other secrets with a `Redacted<T>` wrapper. Use the codebase's existing wrapper, or a local shared `Redacted<T>` when it has none. Wrap these values at the boundary, preserve the wrapper through application code, and unwrap only in the module performing the final I/O operation that requires the raw value.
 
 Errors, traces, logs, metrics, reports, and snapshots contain only redacted representations of secrets and approved representations of personal data.
 

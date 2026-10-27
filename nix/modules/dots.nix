@@ -15,9 +15,6 @@ in
 
   # Only configs with no dedicated module belong here. terminals/tmux/nvim/zsh/
   # btop link to dots/ from their own modules (via dotsLink).
-  # Context helper for the KDE Activities port of the niri contexts.
-  home.file.".local/bin/kde-ctx".source = link "bin/kde-ctx";
-
   xdg.configFile = {
     "herdr".source = link ".config/herdr";
     "lazygit".source = link ".config/lazygit";

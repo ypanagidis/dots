@@ -1,4 +1,4 @@
-{ pkgs, ... }:
+{ pkgs, lib, ... }:
 
 let
   # Plasma occasionally forgets the panel hiding mode after sleep/resume. This
@@ -19,6 +19,190 @@ let
       evaluateScript \
       s "$plasma_script" >/dev/null 2>&1 || true
   '';
+
+  # One-shot KWin script behind `kde-apps comms`: Slack, Telegram, Discord
+  # top to bottom in equal thirds of HDMI-A-1 (the portrait screen niri uses
+  # for comms), or side by side on the active screen if HDMI-A-1 is missing.
+  # Only the apps that have a window take part.
+  commsLayout = pkgs.writeText "kde-comms-layout.js" ''
+    const order = ["slack", "org.telegram.desktop", "discord"];
+    const output = workspace.screens.find((o) => o.name === "HDMI-A-1") || workspace.activeScreen;
+    const area = workspace.clientArea(KWin.MaximizeArea, output, workspace.currentDesktop);
+    const wins = order
+      .map((id) => workspace.windowList().find((w) =>
+        w.normalWindow && (w.resourceClass.toLowerCase() === id || w.desktopFileName === id)))
+      .filter((w) => w);
+    const vertical = area.height >= area.width;
+    const span = vertical ? area.height : area.width;
+    wins.forEach((w, i) => {
+      const from = Math.round((i * span) / wins.length);
+      const to = Math.round(((i + 1) * span) / wins.length);
+      w.minimized = false;
+      w.fullScreen = false;
+      w.setMaximize(false, false);
+      w.frameGeometry = vertical
+        ? { x: area.x, y: area.y + from, width: area.width, height: to - from }
+        : { x: area.x + from, y: area.y, width: to - from, height: area.height };
+    });
+    // Raise all three, ending on Slack.
+    wins.slice().reverse().forEach((w) => { workspace.activeWindow = w; });
+  '';
+
+  # Hyper-key helpers for apps that aren't taskbar pins (Plasma only has
+  # shortcuts for the first 10 pins).
+  #   kde-apps focus <window-class> <desktop-id>
+  #     Focus the app's window, or launch it from its desktop entry if it has
+  #     none (also reopens apps hiding in the tray). Pressing again while it's
+  #     focused cycles through its windows.
+  #   kde-apps comms
+  #     Open whichever of Slack/Telegram/Discord has no window, then tile all
+  #     three with commsLayout. Window classes double as desktop ids here.
+  # Wispr Flow's status pill is an always-on-top, transparent 512x614 X11
+  # window at the bottom middle of a screen. Electron's setIgnoreMouseEvents
+  # never reaches X11 here, so the whole box keeps an input region and eats
+  # clicks meant for whatever is underneath (Spotify's player controls on
+  # DP-2). This watches for the pill being mapped and empties its input
+  # region; the pill still shows and works from the hotkey, it just can't be
+  # clicked or dragged.
+  wisprPillClickThrough =
+    pkgs.writers.writePython3Bin "wispr-pill-click-through"
+      { libraries = [ pkgs.python3Packages.xlib ]; }
+      ''
+        import select
+
+        from Xlib import X, Xatom, display
+        from Xlib.ext import shape
+
+        # Created as "Flow Status Indicator"; the page retitles it "Status".
+        TITLES = {"Status", "Flow Status Indicator"}
+
+        d = display.Display()
+        d.set_error_handler(lambda *_: None)  # windows can vanish mid-check
+        root = d.screen().root
+        net_wm_name = d.intern_atom("_NET_WM_NAME")
+        pills = {}
+
+
+        def consider(w):
+            # The pill often maps before its title is set, so also watch the
+            # title of every window that might still turn into it.
+            try:
+                w.change_attributes(event_mask=X.PropertyChangeMask)
+                cls = w.get_wm_class()
+                title = w.get_full_text_property(net_wm_name) or w.get_wm_name()
+            except Exception:
+                return
+            if cls and cls[0] == "wispr-flow" and title in TITLES:
+                pills[w.id] = w
+
+
+        def clear_pills():
+            # Wispr resets the input region without a ShapeNotify, so this
+            # runs on every event and on a short timer.
+            for wid, w in list(pills.items()):
+                try:
+                    if w.shape_get_rectangles(shape.SK.Input).rectangles:
+                        w.shape_rectangles(
+                            shape.SO.Set, shape.SK.Input, X.Unsorted, 0, 0, []
+                        )
+                except Exception:
+                    del pills[wid]  # destroyed
+            d.flush()
+
+
+        root.change_attributes(event_mask=X.SubstructureNotifyMask)
+        for w in root.query_tree().children:
+            consider(w)
+        while True:
+            clear_pills()
+            if not d.pending_events():
+                select.select([d], [], [], 0.5)
+            while d.pending_events():
+                event = d.next_event()
+                if event.type == X.MapNotify:
+                    consider(event.window)
+                elif event.type == X.PropertyNotify and event.atom in (
+                    net_wm_name,
+                    Xatom.WM_NAME,
+                ):
+                    consider(event.window)
+      '';
+
+  kdeApps = pkgs.writeShellApplication {
+    name = "kde-apps";
+    runtimeInputs = [
+      pkgs.coreutils
+      pkgs.gawk
+      pkgs.kdotool
+      pkgs.kdePackages.kde-cli-tools
+      pkgs.systemd
+    ];
+    text = ''
+      # Window ids whose class is exactly $1 (kdotool takes a regex).
+      windows() { kdotool search --class "^''${1//./\\.}$" 2>/dev/null || true; }
+
+      launch() { kstart --application "$1" >/dev/null 2>&1; }
+
+      focus() {
+        local class="$1" desktop="$2" ids active next
+        ids="$(windows "$class")"
+        if [ -z "$ids" ]; then
+          launch "$desktop"
+          return
+        fi
+        active="$(kdotool getactivewindow 2>/dev/null || true)"
+        # The window after the active one, wrapping; the first if none is active.
+        next="$(printf '%s\n' "$ids" | awk -v a="$active" '
+          NR == 1 { first = $0 }
+          hit { print; found = 1; exit }
+          $0 == a { hit = 1 }
+          END { if (!found) print first }
+        ')"
+        kdotool windowactivate "$next"
+      }
+
+      comms() {
+        local apps=(slack org.telegram.desktop discord) launched=() app
+        for app in "''${apps[@]}"; do
+          if [ -z "$(windows "$app")" ]; then
+            launch "$app" || continue
+            launched+=("$app")
+          fi
+        done
+        if [ "''${#launched[@]}" -gt 0 ]; then
+          # Wait up to 20s for the new windows, then give Electron a moment to
+          # settle its own initial size before we override it.
+          for _ in $(seq 100); do
+            missing=0
+            for app in "''${launched[@]}"; do
+              [ -n "$(windows "$app")" ] || missing=1
+            done
+            [ "$missing" -eq 0 ] && break
+            sleep 0.2
+          done
+          sleep 1
+        fi
+
+        local name=kde-apps-comms id
+        busctl --user call org.kde.KWin /Scripting org.kde.kwin.Scripting \
+          unloadScript s "$name" >/dev/null 2>&1 || true
+        id="$(busctl --user call org.kde.KWin /Scripting org.kde.kwin.Scripting \
+          loadScript ss ${commsLayout} "$name" | awk '{print $2}')"
+        busctl --user call org.kde.KWin "/Scripting/Script$id" org.kde.kwin.Script run >/dev/null
+        busctl --user call org.kde.KWin /Scripting org.kde.kwin.Scripting \
+          unloadScript s "$name" >/dev/null
+      }
+
+      case "''${1:-}" in
+        focus) focus "$2" "$3" ;;
+        comms) comms ;;
+        *)
+          echo "usage: kde-apps focus <window-class> <desktop-id> | kde-apps comms" >&2
+          exit 2
+          ;;
+      esac
+    '';
+  };
 in
 {
   programs.plasma = {
@@ -28,6 +212,18 @@ in
       lookAndFeel = "org.kde.breezedark.desktop";
       colorScheme = "BreezeDark";
       theme = "breeze-dark";
+    };
+    # Never suspend on idle; the screens still dim and turn off. The display
+    # timers match Plasma's defaults, pinned so an upstream change can't move
+    # them.
+    powerdevil.AC = {
+      autoSuspend.action = "nothing";
+      powerButtonAction = "showLogoutScreen";
+      dimDisplay.idleTimeout = 300;
+      turnOffDisplay = {
+        idleTimeout = 600;
+        idleTimeoutWhenLocked = 60;
+      };
     };
     startup.desktopScript.bottom-panel-autohide = {
       runAlways = true;
@@ -78,15 +274,8 @@ in
       kwin."Show Desktop" = "Meta+D";
       kwin."Switch One Desktop Down" = "Meta+Ctrl+Down";
       kwin."Switch One Desktop Up" = "Meta+Ctrl+Up";
-      # Hyper+H/L scroll the focused screen's desktops — niri muscle memory.
-      kwin."Switch One Desktop to the Left" = [
-        "Meta+Ctrl+Left"
-        "Meta+Ctrl+Alt+Shift+H"
-      ];
-      kwin."Switch One Desktop to the Right" = [
-        "Meta+Ctrl+Right"
-        "Meta+Ctrl+Alt+Shift+L"
-      ];
+      kwin."Switch One Desktop to the Left" = "Meta+Ctrl+Left";
+      kwin."Switch One Desktop to the Right" = "Meta+Ctrl+Right";
       kwin."Switch Window Down" = "Meta+Alt+Down";
       kwin."Switch Window Left" = "Meta+Alt+Left";
       kwin."Switch Window Right" = "Meta+Alt+Right";
@@ -175,10 +364,16 @@ in
         "Alt+F1"
         "Alt+Space"
       ];
-      # Hyper+A/C belong to the kde-ctx focus-or-launch binds below; the
-      # taskbar pins keep their Meta+N activation only.
-      plasmashell."activate task manager entry 1" = "Meta+1";
-      plasmashell."activate task manager entry 2" = "Meta+2";
+      # Hyper+<letter> focuses the pinned app, or launches it if it isn't
+      # running: A = browser, C = ghostty, D = discord, and so on.
+      plasmashell."activate task manager entry 1" = [
+        "Meta+1"
+        "Meta+Ctrl+Alt+Shift+A"
+      ];
+      plasmashell."activate task manager entry 2" = [
+        "Meta+2"
+        "Meta+Ctrl+Alt+Shift+C"
+      ];
       plasmashell."activate task manager entry 3" = [
         "Meta+3"
         "Meta+Ctrl+Alt+Shift+D"
@@ -208,20 +403,8 @@ in
       plasmashell.clipboard_action = "Meta+Ctrl+X";
       plasmashell.cycle-panels = "Meta+Alt+P";
       plasmashell."manage activities" = "Meta+Q";
-      # Hyper+J/K move down/up the activity (context) list — niri muscle memory.
-      plasmashell."next activity" = [
-        "Meta+A"
-        "Meta+Ctrl+Alt+Shift+J"
-      ];
-      plasmashell."previous activity" = [
-        "Meta+Shift+A"
-        "Meta+Ctrl+Alt+Shift+K"
-      ];
-      ActivityManager."switch-to-activity-7cd1ec6d-2640-4af9-8e0f-36858842803d" = "Meta+Ctrl+1";
-      ActivityManager."switch-to-activity-a205ecff-1dcf-4f19-84e9-b12ac444c66d" = "Meta+Ctrl+2";
-      ActivityManager."switch-to-activity-3cc4025f-62c5-4d35-bad7-2eeac5962746" = "Meta+Ctrl+3";
-      ActivityManager."switch-to-activity-c608c6c9-b6c3-4e10-ab72-2509f64c8a81" = "Meta+Ctrl+4";
-      ActivityManager."switch-to-activity-88c96075-3fd2-47a6-90e6-70f9b4556a51" = "Meta+Ctrl+5";
+      plasmashell."next activity" = "Meta+A";
+      plasmashell."previous activity" = "Meta+Shift+A";
       plasmashell."show dashboard" = "Ctrl+F12";
       plasmashell.show-on-mouse-pos = "Meta+V";
       "services/org.kde.spectacle.desktop"._launch = [
@@ -232,34 +415,26 @@ in
     # Meta+Shift+S: draw a region, image lands on the clipboard, no window —
     # same flow as the old grim/slurp binding on niri. (-r region, -b no GUI,
     # -c clipboard)
-    # Context launchers, focus-or-launch (niri muscle memory): Hyper+C/A
-    # activate the context's existing terminal/browser window, or open it
-    # (terminal: herdr work session; browser: context profile on the next
-    # desktop). Hyper+Return/B force a fresh window.
-    hotkeys.commands.kde-ctx-term = {
-      name = "Context terminal (focus or launch)";
-      key = "Meta+Ctrl+Alt+Shift+C";
-      command = "/home/yiannis/.local/bin/kde-ctx term";
-    };
-    hotkeys.commands.kde-ctx-browser = {
-      name = "Context browser (focus or launch)";
-      key = "Meta+Ctrl+Alt+Shift+A";
-      command = "/home/yiannis/.local/bin/kde-ctx browser";
-    };
-    hotkeys.commands.kde-ctx-term-new = {
-      name = "Context terminal (new window)";
-      key = "Meta+Ctrl+Alt+Shift+Return";
-      command = "/home/yiannis/.local/bin/kde-ctx term --new";
-    };
-    hotkeys.commands.kde-ctx-browser-new = {
-      name = "Context browser (new window)";
-      key = "Meta+Ctrl+Alt+Shift+B";
-      command = "/home/yiannis/.local/bin/kde-ctx browser --new";
-    };
     hotkeys.commands.spectacle-region-clipboard = {
       name = "Region screenshot to clipboard";
       key = "Meta+Shift+S";
       command = "spectacle -r -b -c";
+    };
+    hotkeys.commands.focus-t3-code = {
+      name = "Focus or launch T3 Code";
+      key = "Meta+Ctrl+Alt+Shift+F";
+      command = "${kdeApps}/bin/kde-apps focus com.t3tools.T3Code t3-code";
+    };
+    hotkeys.commands.focus-slack = {
+      name = "Focus or launch Slack";
+      key = "Meta+Ctrl+Alt+Shift+S";
+      command = "${kdeApps}/bin/kde-apps focus slack slack";
+    };
+    # Hyper+V, same as niri-ctx comms.
+    hotkeys.commands.comms-layout = {
+      name = "Open and tile Slack, Telegram, Discord";
+      key = "Meta+Ctrl+Alt+Shift+V";
+      command = "${kdeApps}/bin/kde-apps comms";
     };
     window-rules = [
       {
@@ -289,16 +464,7 @@ in
       dolphinrc.General.ViewPropsTimestamp = "2025,12,25,3,11,27.774";
       dolphinrc."KFileDialog Settings"."Places Icons Auto-resize" = false;
       dolphinrc."KFileDialog Settings"."Places Icons Static Size" = 22;
-      # Activities = the context groups from the niri setup (contexts.conf).
-      # Each is an independent window set on top of the (per-screen) desktop
-      # grid. Meta+A / Meta+Shift+A cycle, Meta+Q manages, Meta+Ctrl+1..5
-      # jump directly. The pre-existing UUID stays as Admin so windows that
-      # predate this config land there.
-      kactivitymanagerdrc.activities."88c96075-3fd2-47a6-90e6-70f9b4556a51" = "Admin";
-      kactivitymanagerdrc.activities."7cd1ec6d-2640-4af9-8e0f-36858842803d" = "UP";
-      kactivitymanagerdrc.activities."a205ecff-1dcf-4f19-84e9-b12ac444c66d" = "Webroot";
-      kactivitymanagerdrc.activities."3cc4025f-62c5-4d35-bad7-2eeac5962746" = "Sealant";
-      kactivitymanagerdrc.activities."c608c6c9-b6c3-4e10-ab72-2509f64c8a81" = "Side";
+      kactivitymanagerdrc.activities."88c96075-3fd2-47a6-90e6-70f9b4556a51" = "Default";
       kactivitymanagerdrc.main.currentActivity = "88c96075-3fd2-47a6-90e6-70f9b4556a51";
       katerc.General."Days Meta Infos" = 30;
       katerc.General."Save Meta Infos" = true;
@@ -389,12 +555,8 @@ in
       kwalletrc.Wallet."Use One Wallet" = true;
       kwalletrc."org.freedesktop.secrets".apiEnabled = true;
       kwinrc.Desktops.Id_1 = "6c7ed35d-a893-4861-a4d8-e10caa85be7d";
-      kwinrc.Desktops.Number = 4;
+      kwinrc.Desktops.Number = 1;
       kwinrc.Desktops.Rows = 1;
-      # Plasma 6.7: each screen switches desktops independently — with
-      # fullscreen-ish windows and Meta+Ctrl+Left/Right this approximates
-      # niri's per-output scrolling strip.
-      kwinrc.Windows.PerOutputVirtualDesktops = true;
       # New windows open on the screen the mouse is on — niri's mouse-driven
       # output model, instead of "primary display" or last-focused guessing.
       kwinrc.Windows.ActiveMouseScreen = true;
@@ -424,9 +586,13 @@ in
       # recreated, re-check with: grep -B20 icontasks plasma-org...appletsrc
       "plasma-org.kde.plasma.desktop-appletsrc"."Containments/4/Applets/7/Configuration/General".launchers =
         {
-          value = "applications:helium.desktop,applications:com.mitchellh.ghostty.desktop,applications:discord.desktop,applications:spotify.desktop,applications:obsidian.desktop,applications:datagrip.desktop,applications:bruno.desktop,applications:systemsettings.desktop,preferred://filemanager";
+          value = "applications:helium.desktop,applications:com.mitchellh.ghostty.desktop,applications:discord.desktop,applications:spotify.desktop,applications:obsidian.desktop,applications:datagrip.desktop,applications:bruno.desktop,applications:systemsettings.desktop,preferred://filemanager,applications:t3-code.desktop";
           escapeValue = false;
         };
+      # T3 Code writes its own hidden com.t3tools.T3Code.desktop, which would
+      # win the app-id match and leave the window ungrouped from the pin above.
+      # Map the app id to ours.
+      taskmanagerrulesrc.Mapping."com.t3tools.T3Code" = "t3-code";
       # Capture the region on mouse release — no separate Accept click.
       spectaclerc.General.useReleaseToCapture = true;
       # Klipper drops image clipboard entries by default; without this the
@@ -604,4 +770,23 @@ in
 
     Install.WantedBy = [ "timers.target" ];
   };
+
+  # Wispr Flow's own "open at login" is a no-op on Linux (Electron only
+  # implements it on macOS/Windows), so start it with Plasma. Same flags as
+  # its desktop entry: the X11 backend is what its hotkey capture needs.
+  xdg.configFile."autostart/wispr-flow.desktop".text = ''
+    [Desktop Entry]
+    Type=Application
+    Name=Wispr Flow
+    Exec=${pkgs.wispr-flow}/bin/wispr-flow --ozone-platform=x11
+    OnlyShowIn=KDE;
+  '';
+  xdg.configFile."autostart/wispr-pill-click-through.desktop".text = ''
+    [Desktop Entry]
+    Type=Application
+    Name=Wispr Flow pill click-through
+    Exec=${lib.getExe wisprPillClickThrough}
+    OnlyShowIn=KDE;
+    NoDisplay=true
+  '';
 }

@@ -57,7 +57,7 @@ Plain functions, immutable value classes, and static-style classes are all valid
 
 An Application Service owns one cohesive application operation or capability. Use one when behavior coordinates authorization, domain decisions, persistence, external calls, transactions, messages, time, IDs, telemetry, or multiple entrypoints.
 
-Design a meaningful service from its explicit interface first. In plain TypeScript, use a service interface and implementation class. When an Effect service, tag, `make`, Layer, or dependency requirement changes, read and apply [`effect-services.md`](effect-services.md). Reserve service interfaces for helpers that own an application capability.
+Design a meaningful service from its explicit interface first. In plain TypeScript, use a service interface and implementation class. Reserve service interfaces for helpers that own an application capability.
 
 An Application Service:
 
@@ -67,7 +67,7 @@ An Application Service:
 - owns which effects occur, under what policy, and in what order;
 - keeps its public contract independent of framework, ORM, vendor SDK, and runtime types.
 
-Plain TypeScript dependency-bearing classes receive service objects through constructors. Effect code yields stable runtime capabilities and implementation dependencies through context. Authorization evidence, scoped handles, and other operation-specific capability values remain explicit inputs when they are part of the request or domain contract. A callback dependency is appropriate when higher-order behavior itself is the capability.
+Plain TypeScript dependency-bearing classes receive service objects through constructors. Authorization evidence, scoped handles, and other operation-specific capability values remain explicit inputs when they are part of the request or domain contract. A callback dependency is appropriate when higher-order behavior itself is the capability.
 
 A service may expose multiple related methods when they share one owner and reason to change. `Service` is an honest name for a broad cohesive capability when a more specific noun would misstate its scope, as with `EmailService` or `UserService`.
 

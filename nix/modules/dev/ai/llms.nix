@@ -54,6 +54,7 @@ in
   home.packages = [
     llmAgents.claude-code
     llmAgents.codex
+    llmAgents.chatgpt
     llmAgents.opencode
     llmAgents.gemini-cli
     llmAgents.orca
@@ -100,8 +101,9 @@ in
   );
 
   # Claude Code and Orca both update settings.json at runtime. Keep it writable,
-  # preserve their settings, and replace only the hook owned by this module.
-  home.activation.installClaudePlannotatorHook = config.lib.dag.entryAfter [ "linkGeneration" ] ''
+  # preserve their settings, and replace only the keys owned by this module:
+  # the plannotator hook and empty commit/PR attribution (no Co-Authored-By).
+  home.activation.installClaudeManagedSettings = config.lib.dag.entryAfter [ "linkGeneration" ] ''
     settingsDir=${lib.escapeShellArg "${home}/.claude"}
     settingsFile="$settingsDir/settings.json"
     managedHook=${lib.escapeShellArg plannotatorClaudeHook}
@@ -120,10 +122,14 @@ in
               | map(select(.matcher != "ExitPlanMode")))
             + $managed[0]
           )
+        | .attribution = ((.attribution // {}) + { commit: "", pr: "" })
       ' "$settingsFile" > "$temp"
     else
       ${pkgs.jq}/bin/jq -n --slurpfile managed "$managedHook" '
-        { hooks: { PermissionRequest: $managed[0] } }
+        {
+          hooks: { PermissionRequest: $managed[0] },
+          attribution: { commit: "", pr: "" }
+        }
       ' > "$temp"
     fi
 

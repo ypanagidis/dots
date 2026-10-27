@@ -89,6 +89,14 @@ let
         hash = "sha256-Tiqx9/vzewqoe7eLZbHWyEWoRF/pIedsu9beja8dRTs=";
       };
 
+  # aggregateModules merges a kmodigest `.ko.cer` for every external module
+  # into modules.cer and fails if one is missing. In-tree builds get them from
+  # `make modules_install`; we copy .ko files by hand, so sign them here. This
+  # runs after the strip hook because stripping drops the appended signature.
+  signModules = ''
+    find "$out/lib/modules" -name '*.ko' -exec ${lib.getExe pkgs.buildPackages.kmodigest} {} \;
+  '';
+
   mt7927BluetoothModules = pkgs.stdenv.mkDerivation {
     pname = "mt7927-bluetooth-modules";
     version = kernel.version;
@@ -99,6 +107,7 @@ let
     '';
 
     nativeBuildInputs = kernel.moduleBuildDependencies ++ [ pkgs.python3 ];
+    postFixup = signModules;
 
     strictDeps = true;
     enableParallelBuilding = true;
@@ -243,6 +252,7 @@ let
     };
 
     nativeBuildInputs = kernel.moduleBuildDependencies ++ [ pkgs.bc ];
+    postFixup = signModules;
 
     strictDeps = true;
     enableParallelBuilding = true;

@@ -8,9 +8,8 @@ Known failures include domain, parsing, authorization, integration, I/O, persist
 
 Use, in order:
 
-1. Effect in an Effect codebase.
-2. `better-result` when available.
-3. A small local tagged union:
+1. `better-result` when available.
+2. A small local tagged union:
 
 ```ts
 type Result<T, E extends Error> =
@@ -54,8 +53,7 @@ Use `casesHandled` for exhaustive union handling. Keep a defect helper local unt
 Expected failures use custom tagged errors, generally extending:
 
 - `Error`;
-- `TaggedError` from `better-result`;
-- `Schema.TaggedErrorClass` in Effect codebases.
+- `TaggedError` from `better-result`.
 
 A custom error includes:
 

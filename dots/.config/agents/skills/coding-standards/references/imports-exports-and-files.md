@@ -37,7 +37,7 @@ A shared generic helper file has an explicit stable subject. A helper may move t
 - exhaustive and exceptional-control-flow helpers such as `casesHandled`, `shouldNeverHappen`, and `notYetImplemented`;
 - sensitive-value wrappers such as `Redacted`;
 - tagged-union type operations such as `Tags`, `ExtractTag`, and `ExcludeTag`;
-- common `Result` operations when the repository uses neither Effect nor `better-result`;
+- common `Result` operations when the repository has no result library;
 - genuinely broad type operations.
 
 Domain and application policy stay with their owning modules.

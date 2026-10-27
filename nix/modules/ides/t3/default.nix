@@ -5,12 +5,13 @@
   ...
 }:
 
-# T3 Code updates itself, like on macOS: electron-updater polls the nightly
-# feed and swaps the AppImage at $APPIMAGE in place. That needs a writable
-# AppImage run through appimage-run (which exports APPIMAGE), plus the binfmt
-# registration from modules/compat/electron-runtime.nix so the updater can
-# relaunch the new file directly. The version pinned here only seeds a fresh
-# install; refresh it with ./update-t3.sh when convenient.
+# T3 Code runs from a writable AppImage through appimage-run (which exports
+# APPIMAGE), plus the binfmt registration from
+# modules/compat/electron-runtime.nix so the app can relaunch the file
+# directly. The upstream nightly pinned here only seeds a fresh install;
+# t3-code-fork-update (below) then replaces it with private fork builds, and
+# the launcher turns the in-app updater off. Refresh the seed with
+# ./update-t3.sh if needed.
 lib.mkIf pkgs.stdenv.hostPlatform.isLinux (
   let
     version = "0.0.46-nightly.20261004.2648";
@@ -48,12 +49,75 @@ lib.mkIf pkgs.stdenv.hostPlatform.isLinux (
           fi
         done
 
+        # Fork builds point at a private feed the app can't read; updates come
+        # from t3-code-fork-update instead.
+        export T3CODE_DISABLE_AUTO_UPDATE=1
         exec ${lib.getExe osConfig.programs.appimage.package} "$app" "$@"
+      '';
+    };
+
+    # Builds from the private fork (ypanagidis/t3code, branch `fork`): upstream
+    # nightly plus local patches, published daily by its fork-nightly workflow.
+    # Those builds have no in-app update feed, so this swaps the AppImage
+    # instead; the running app keeps its old file until restarted.
+    t3ForkUpdate = pkgs.writeShellApplication {
+      name = "t3-code-fork-update";
+      runtimeInputs = [
+        pkgs.coreutils
+        pkgs.gh
+        pkgs.libnotify
+      ];
+      text = ''
+        repo="ypanagidis/t3code"
+        data="''${XDG_DATA_HOME:-$HOME/.local/share}/t3-code"
+        app="$data/T3-Code.AppImage"
+        stamp="$data/fork-release"
+
+        # Offline or signed out: try again next tick.
+        if ! tag=$(gh release view --repo "$repo" --json tagName --jq .tagName); then
+          exit 0
+        fi
+        if [ "$(cat "$stamp" 2>/dev/null)" = "$tag" ]; then
+          exit 0
+        fi
+
+        tmp=$(mktemp -d)
+        trap 'rm -rf "$tmp"' EXIT
+        gh release download "$tag" --repo "$repo" --pattern T3-Code.AppImage --dir "$tmp"
+        mkdir -p "$data"
+        install -m 755 "$tmp/T3-Code.AppImage" "$app.new"
+        mv -f "$app.new" "$app"
+        printf '%s\n' "$tag" > "$stamp"
+        notify-send --app-name "T3 Code" "T3 Code updated" "$tag is installed. Restart T3 Code to use it." || true
       '';
     };
   in
   {
-    home.packages = [ t3Launcher ];
+    home.packages = [
+      t3Launcher
+      t3ForkUpdate
+    ];
+
+    systemd.user.services.t3-code-fork-update = {
+      Unit = {
+        Description = "Install the newest T3 Code fork build";
+        After = [ "graphical-session.target" ];
+      };
+      Service = {
+        Type = "oneshot";
+        ExecStart = lib.getExe t3ForkUpdate;
+      };
+    };
+
+    systemd.user.timers.t3-code-fork-update = {
+      Unit.Description = "Check for new T3 Code fork builds";
+      Timer = {
+        OnBootSec = "2min";
+        OnUnitActiveSec = "1h";
+        Unit = "t3-code-fork-update.service";
+      };
+      Install.WantedBy = [ "timers.target" ];
+    };
 
     xdg.desktopEntries.t3-code = {
       name = "T3 Code";

@@ -62,33 +62,18 @@ let
   };
   piSettingsBaseline = pkgs.writeText "pi-settings.json" (builtins.toJSON piSettings);
 
-  # Executor's Bun executable must remain unpatched: its program is appended
-  # to the binary. nix-ld supplies the libraries expected by upstream.
-  executor = pkgs.stdenvNoCC.mkDerivation {
-    pname = "executor";
-    version = "1.5.40";
-    src = pkgs.fetchurl {
-      url = "https://registry.npmjs.org/executor/-/executor-1.5.40-linux-x64.tgz";
-      hash = "sha256-kXwYuO5eB4hxHewtcYztGlZS+DxzdcHXjBjNxgeGOVI=";
-    };
-    sourceRoot = "package";
-    dontBuild = true;
-    dontStrip = true;
-    installPhase = ''
-      runHook preInstall
-      mkdir -p "$out/bin" "$out/lib/executor"
-      cp -R bin/. "$out/lib/executor/"
-      ln -s ../lib/executor/executor "$out/bin/executor"
-      runHook postInstall
-    '';
-    meta = {
-      description = "Local integration gateway for AI agents";
-      homepage = "https://executor.sh";
-      license = lib.licenses.mit;
-      mainProgram = "executor";
-      platforms = [ "x86_64-linux" ];
-    };
-  };
+  # Executor runs on mendbox (hosts/executor); this machine is only a client.
+  # The bearer token lives outside the store in ~/.config/executor/token.
+  executorOrigin = "https://executor.tailc79e49.ts.net";
+  executorToken = "${home}/.config/executor/token";
+  executorCli = pkgs.writeShellScriptBin "executor" ''
+    token="$(cat ${lib.escapeShellArg executorToken})"
+    # Upstream `open` only finds local daemons; the web UI signs in from ?_token.
+    if [ "''${1-}" = open ]; then
+      exec ${pkgs.xdg-utils}/bin/xdg-open "${executorOrigin}/?_token=$token"
+    fi
+    EXECUTOR_AUTH_TOKEN="$token" exec ${pkgs.callPackage ../../../../pkgs/executor.nix { }}/bin/executor "$@"
+  '';
 
   # Plannotator includes node-pty and installs into Pi's writable package cache.
   pi = pkgs.symlinkJoin {
@@ -112,7 +97,7 @@ in
 {
   home.packages = [
     pi
-    executor
+    executorCli
     # Use nixpkgs' wrapped Marksman instead of Pi Lens' upstream binary, whose
     # bundled .NET runtime aborts on NixOS when it cannot find ICU.
     pkgs.marksman
@@ -124,6 +109,24 @@ in
     # the extension's real store path, so dependencies must be visible here.
     ".pi/agent/node_modules".source = "${piRuntime}/node_modules";
     ".pi/agent/themes".source = "${piRuntime}/themes";
+    # Default server profile for `executor call`/`tools`; without it the CLI
+    # would start an empty local daemon.
+    ".executor/server-connections.json".text = builtins.toJSON {
+      version = 1;
+      defaultProfile = "mendbox";
+      profiles = [
+        {
+          name = "mendbox";
+          connection = {
+            kind = "http";
+            key = "profile:mendbox";
+            origin = executorOrigin;
+            apiBaseUrl = "${executorOrigin}/api";
+            displayName = "mendbox";
+          };
+        }
+      ];
+    };
     ".pi/agent/mcp.json".text = builtins.toJSON {
       settings = {
         hostConfigDiscovery = "off";
@@ -133,12 +136,9 @@ in
         disableProxyTool = true;
       };
       mcpServers.executor = {
-        command = "${executor}/bin/executor";
-        args = [
-          "mcp"
-          "--elicitation-mode"
-          "model"
-        ];
+        url = "${executorOrigin}/mcp";
+        auth = "bearer";
+        bearerToken = "!cat ${lib.escapeShellArg executorToken}";
         lifecycle = "keep-alive";
         protocolVersion = "auto";
         requestTimeoutMs = 120000;
@@ -178,21 +178,4 @@ in
     ${pkgs.coreutils}/bin/mv "$temp" "$settingsFile"
     trap - EXIT
   '';
-
-  systemd.user.services.executor = {
-    Unit.Description = "Executor integration gateway";
-    Service = {
-      Type = "simple";
-      ExecStart = "${executor}/bin/executor daemon run --foreground --hostname 127.0.0.1 --port 4788";
-      Restart = "on-failure";
-      RestartSec = 2;
-      UMask = "0077";
-      Environment = [
-        "HOME=${home}"
-        "DO_NOT_TRACK=1"
-        "EXECUTOR_DISABLE_ANALYTICS=1"
-      ];
-    };
-    Install.WantedBy = [ "default.target" ];
-  };
 }

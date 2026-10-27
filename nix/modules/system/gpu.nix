@@ -13,7 +13,33 @@
   hardware.nvidia = {
     modesetting.enable = true;
     nvidiaSettings = true;
-    package = config.boot.kernelPackages.nvidiaPackages.production;
+    # Newest non-beta release (615 new-feature branch, 2026-10-07). nixpkgs
+    # still ships 615.71.09 as new_feature; switch back to
+    # nvidiaPackages.latest once it catches up.
+    package =
+      (config.boot.kernelPackages.nvidiaPackages.mkDriver {
+        version = "615.78.08";
+        sha256_64bit = "sha256-Pj9t3cLudnoIGFMAr3vjyyhuznZpjS3eNSRZl4LQf/4=";
+        openSha256 = "sha256-HBINiOjL0ZJLIAJeNIBYHBnwgUXtNwPPtnFpAI1YwF4=";
+        settingsSha256 = "sha256-inDRpG02sdDgHmlqgu/DsgK8OFdOt1fZIYyXdhlGC/c=";
+        persistencedSha256 = "sha256-RzeR6Ldct6MUxjnXRyThdh5Y3jjMehTVg85MtwuWNX4=";
+      }).overrideAttrs
+        (old: {
+          # builder.sh sets interpreter and rpath in one patchelf call, which on
+          # 615.78.08 emits a new RW LOAD that overlaps the next R LOAD. The
+          # page holding .dynamic ends up read-only and ld.so segfaults writing
+          # DT_DEBUG (nvidia-smi, nvidia-cuda-mps-control, nvidia-powerd).
+          # Patching rpath and interpreter in separate passes gives a clean
+          # layout. Drop once nixpkgs' builder stops producing it.
+          postFixup = (old.postFixup or "") + ''
+            for i in $bin/origBin/*; do
+              dst=$bin/bin/$(basename "$i")
+              install -m755 "$i" "$dst"
+              patchelf --set-rpath "$out/lib:$libPath" "$dst"
+              patchelf --interpreter "$(cat $NIX_CC/nix-support/dynamic-linker)" "$dst"
+            done
+          '';
+        });
     open = true;
     powerManagement = {
       enable = true;

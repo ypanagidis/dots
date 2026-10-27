@@ -114,6 +114,79 @@ The `llm-agents` flake supplies:
 
 Update the shared input and rebuild with `uai`. Add or remove non-Pi agents in `nix/modules/dev/ai/llms.nix`.
 
+### Subscription pooling with CLIProxyAPI
+
+`nix/modules/dev/ai/cliproxyapi.nix` installs upstream CLIProxyAPI from the
+existing `llm-agents` pin and runs it as a user service at `127.0.0.1:8317`.
+One local package patch removes upstream's `about:blank` browser probe, which
+otherwise triggers a KIO missing-file dialog during login on KDE.
+It uses `fill-first` routing: requests use the first available account for the
+requested model, then try another account when that credential hits a limit.
+Codex and Claude have separate account pools. An exhausted Claude pool does
+not switch to a Codex model, or vice versa.
+
+After rebuilding, check the service and add each subscription:
+
+```sh
+systemctl --user status cliproxyapi
+
+cliproxyapi -codex-login    # repeat for each ChatGPT/Codex account
+cliproxyapi -claude-login   # repeat for each Claude account
+```
+
+Choose a different account in the browser for each login. Logging into the same
+account again refreshes its credentials rather than adding another subscription.
+For a browserless Codex login, use `cliproxyapi -codex-device-login`.
+To open an authorization URL manually, add `-no-browser` to either login command.
+The service watches the auth directory, so adding accounts needs no restart.
+
+Run the agents through the pool with:
+
+```sh
+codex-proxy                # accepts the usual Codex arguments and subcommands
+claude-proxy               # accepts the usual Claude Code arguments
+```
+
+These launchers select the local proxy for that process. Plain `codex` and
+`claude` keep their existing configuration. Editors and other agent hosts must
+also use the proxy launcher or configure the endpoint themselves. OpenAI API
+clients use `http://127.0.0.1:8317/v1`; Anthropic API clients use
+`http://127.0.0.1:8317`. Their client key is in
+`~/.local/state/cliproxyapi/api-key`.
+
+The local management panel is at `http://127.0.0.1:8317/management.html`.
+Its separate login key is in `~/.local/state/cliproxyapi/management-key`.
+Use the panel to inspect accounts, disable one, or set credential priorities
+if you want a particular account used first. Higher priorities win; login
+order alone does not determine routing order.
+
+Tokens live in `~/.local/state/cliproxyapi/auth/`. Keys and the writable runtime
+configuration live alongside it, with private permissions. These paths follow
+Home Manager's `xdg.stateHome` if customized. No credentials enter the repository
+or Nix store. Service starts regenerate `config.yaml` from the Nix baseline,
+so change persistent server/routing settings in the module. Account files,
+keys, and saved quota cooldowns survive restarts. The pool can return to an
+earlier account once its cooldown expires.
+
+```sh
+journalctl --user -u cliproxyapi -f
+systemctl --user restart cliproxyapi
+```
+
+Failover needs another account that can serve the requested model. If every
+matching account is exhausted, the request still fails. A stream that has
+already delivered output cannot be transparently replayed on another account.
+
+References: [upstream configuration](https://github.com/router-for-me/CLIProxyAPI/blob/v8.0.28/config.example.yaml),
+[Codex custom providers](https://learn.chatgpt.com/docs/config-file/config-advanced#custom-model-providers),
+and [Claude Code gateway configuration](https://code.claude.com/docs/en/llm-gateway-connect).
+
+The browser regression check uses a fake opener and never completes a login:
+
+```sh
+python tests/cliproxyapi-browser.py "$(command -v cli-proxy-api)"
+```
+
 ### Shared skills
 
 The repository-owned skill tree lives at:
@@ -147,19 +220,18 @@ The setup includes workflows, subagents, background terminals, file search, git 
 
 ### Executor integrations
 
-Executor is the local integration gateway used by Pi for Figma, Linear, and future services. Nix installs it, starts a user service on `127.0.0.1:4788`, and connects Pi over stdio.
+Executor is the integration gateway used by Pi and Claude Code for Figma, Linear, and future services. It runs on mendbox in an unprivileged NixOS LXC (CT 170, `nix/hosts/executor`) and is reachable only on the tailnet at `https://executor.tailc79e49.ts.net`. The tailnet policy admits member devices and `tag:mend` VMs on port 443; Executor's bearer token is required on top of that.
 
-After rebuilding:
+Clients read the token from `~/.config/executor/token` (mode 600). Pi and the `executor` CLI wrapper pick it up from there; Claude Code gets it through `~/.config/executor/mcp-headers`, a `headersHelper` script.
 
-1. Check the service with `systemctl --user status executor`.
-2. Open the local console with `executor open`.
-3. Add Linear from `https://mcp.linear.app/mcp` and authenticate it.
-4. Add Figma from `https://mcp.figma.com/mcp`.
-5. Create separate Figma connections named `personal` and `work`.
-6. Open `/mcp` in Pi and confirm that `executor` is connected.
-7. If tools are still loading on first use, run `/mcp reconnect executor`.
+1. Open the web console with `executor open`.
+2. Add Linear from `https://mcp.linear.app/mcp` and authenticate it.
+3. Add Figma from `https://mcp.figma.com/mcp`.
+4. Create separate Figma connections named `personal` and `work`.
+5. Open `/mcp` in Pi and confirm that `executor` is connected.
+6. If tools are still loading on first use, run `/mcp reconnect executor`.
 
-OAuth tokens, bearer tokens, and Executor's local database stay outside the Nix store. More detail, including the Figma account-selection rules, is in [`docs/pi-skills.md`](docs/pi-skills.md).
+Deploy changes to the container with `nixos-rebuild switch --flake .#executor --target-host root@executor.tailc79e49.ts.net` from `nix/`. Tailscale SSH asks for a browser check every 12 hours. If the tailnet is down, `pct enter 170` on mendbox still works. More detail, including the Figma account-selection rules, is in [`docs/pi-skills.md`](docs/pi-skills.md).
 
 ## macOS setup
 

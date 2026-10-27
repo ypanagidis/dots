@@ -176,6 +176,16 @@ in
     reserve_space = true
   '';
 
+  # The machine stays on overnight; the monitors shouldn't. Noctalia powers
+  # every output off after 15 idle minutes and back on at the next input.
+  # Idle inhibitors (video playback, the caffeine toggle) keep them on.
+  xdg.configFile."noctalia/20-idle.toml".text = ''
+    [idle.behavior.screen-off]
+    timeout = 900
+    action = "screen_off"
+    enabled = true
+  '';
+
   # Catch invalid KDL during Home Manager activation, before the next login.
   home.activation.validateNiriConfig = config.lib.dag.entryAfter [ "writeBoundary" ] ''
     ${pkgs.niri}/bin/niri validate --config ${config.xdg.configHome}/niri/config.kdl

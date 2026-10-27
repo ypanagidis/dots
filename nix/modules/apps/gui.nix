@@ -86,4 +86,11 @@ in
     ];
     settings.StartupWMClass = "discord";
   };
+
+  # Sign-in links. Wispr Flow registers a wispr-flow.desktop that doesn't
+  # exist, so point its scheme at the packaged entry.
+  xdg.mimeApps.defaultApplications = lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
+    "x-scheme-handler/wispr-flow" = "ai.wisprflow.WisprFlow.desktop";
+    "x-scheme-handler/slack" = "slack.desktop";
+  };
 }

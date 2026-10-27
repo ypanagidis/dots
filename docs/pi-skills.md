@@ -22,30 +22,44 @@ same tree. The tree includes the user-invoked `/plannotator-review`,
 MCP adapter are runtime integration rather than additional workflow suites.
 The adapter's optional `mcp-scripting` skill is not installed.
 
-## Executor bootstrap after rebuild
+## Executor setup
 
-Nix installs Executor, starts its local-only user service on port 4788, and
-connects Pi through the pinned MCP adapter using `executor mcp` over stdio.
-The CLI bridge authenticates with the daemon locally, so its bearer token,
-OAuth tokens, and Executor's local database remain writable runtime state;
-they never enter Pi's config or the Nix store.
+Executor runs on mendbox (CT 170, `nix/hosts/executor`), bound to loopback
+and published on the tailnet by `tailscale serve` at
+`https://executor.tailc79e49.ts.net`. Pi connects over HTTP with a bearer
+token read at connect time from `~/.config/executor/token`; the `executor`
+CLI wrapper reads the same file and targets the `mendbox` server profile.
+The token, OAuth tokens, and Executor's database stay on the server or in
+that file; they never enter Pi's config or the Nix store.
+
+The token itself lives on the server in
+`/var/lib/executor/.executor/server-control/auth.json`. To rotate it, run
+`runuser -u executor -- env HOME=/var/lib/executor executor server rotate-token`
+in the container, restart `executor.service`, and copy the new value to every
+client's token file.
+
+OAuth connections must be added through a localhost tunnel. When a provider
+supports client ID metadata documents (Atlassian does), Executor's release
+build always uses `https://executor.sh/api/oauth/client-id-metadata/local.json`,
+which only allows loopback callbacks, so a sign-in started from the `ts.net`
+origin fails with "redirect_uri is not registered for client". Instead run
+`ssh -N -L 4788:127.0.0.1:4788 root@executor.tailc79e49.ts.net` and open
+`http://localhost:4788/?_token=…` for the sign-in. Token refresh happens on
+the server, so the tunnel is only needed to connect or re-authorize.
 
 Pi's `settings.json` is materialized as a writable runtime file rather than a
 Nix-store symlink. Pi owns interactive preferences such as the selected model,
 thinking level, theme, and `/codex-fast` mode, so they survive restarts and
 rebuilds. Nix owns the package list and version pins.
 
-1. Rebuild with `rebuild`, or from `nix/` run
-   `sudo nixos-rebuild switch --flake .#nixos`.
-2. Confirm the service with `systemctl --user status executor`.
-3. Run `executor open` to open the local console.
-4. Add Linear's MCP source at `https://mcp.linear.app/mcp` and authenticate its
+1. Run `executor open` to open the web console.
+2. Add Linear's MCP source at `https://mcp.linear.app/mcp` and authenticate its
    connection.
-5. Add Figma's MCP source at `https://mcp.figma.com/mcp` once. Create two
+3. Add Figma's MCP source at `https://mcp.figma.com/mcp` once. Create two
    connections from that integration, named `personal` and `work`, and complete
    OAuth with the corresponding Figma account for each. Use separate browser
    profiles or a private window if Figma keeps selecting the wrong account.
-6. In Pi, open `/mcp`. The `executor` server should be connected. On the first
+4. In Pi, open `/mcp`. The `executor` server should be connected. On the first
    run, use `/mcp reconnect executor` if its direct tools are still populating
    the metadata cache.
 
@@ -63,10 +77,14 @@ REST integration: the REST API does not provide the remote MCP server's full
 
 ### Automatically invoked
 
-- **coding-standards** — a repository-owned snapshot of Dillon Mulroy's
-  TypeScript and Effect standards, kept unchanged for now. Load the root skill
-  for implementation and standards review, then read only the reference
-  branches relevant to the changed behavior.
+- **coding-standards** — TypeScript standards, derived from Dillon Mulroy's.
+  Its Effect references were removed; Effect code goes to `effect-layers`.
+  Load the root skill for implementation and standards review, then read only
+  the reference branches relevant to the changed behavior.
+- **effect-layers** — Effect v4 services, layers, composition roots,
+  entrypoints and `ManagedRuntime`, layer tests, and a layer-graph audit.
+  Checked against effect 4.0.6 source. On an Effect bump, re-read the files in
+  its `references/sources.md`.
 - **domain-modeling** — activate when domain terminology, relationships, or
   lifecycle states are actively being established or changed. Merely reading
   an existing `CONTEXT.md` does not invoke the skill.

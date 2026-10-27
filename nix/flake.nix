@@ -93,5 +93,11 @@
           }
         ];
       };
+
+      # Executor gateway LXC on mendbox; see hosts/executor/default.nix.
+      nixosConfigurations.executor = nixpkgs.lib.nixosSystem {
+        system = "x86_64-linux";
+        modules = [ ./hosts/executor ];
+      };
     };
 }

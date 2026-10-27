@@ -54,6 +54,29 @@
         IdentitiesOnly = "yes";
         IdentityFile = "~/.ssh/id_ed25519";
       };
+      wrt = {
+        HostName = "wrt.webroot.ai";
+        User = "root";
+        IdentitiesOnly = "yes";
+        IdentityFile = "~/.ssh/id_ed25519_wr_yp";
+      };
+      clwrt = {
+        HostName = "clwrt.webroot.ai";
+        User = "root";
+        IdentitiesOnly = "yes";
+        IdentityFile = "~/.ssh/id_ed25519_wr_yp";
+      };
+      up = {
+        HostName = "57.129.44.130";
+        User = "yiannis";
+        IdentitiesOnly = "yes";
+        IdentityFile = "~/.ssh/id_ed25519";
+      };
+      # Large personal VPS.
+      mendbox = {
+        HostName = "49.12.133.97";
+        User = "root";
+      };
     };
   };
 

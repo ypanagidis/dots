@@ -91,9 +91,10 @@
     useRoutingFeatures = "client";
   };
 
-  # Accept SSH over trusted interfaces. `tailscale0` is trusted below, while
-  # port 22 stays closed on the public and LAN firewall. Password login remains
-  # available until the client key has been copied over.
+  # Accept SSH over trusted interfaces (`tailscale0`, trusted below) and on the
+  # home LAN (the wired `enp12s0`, opened below); the port stays closed
+  # elsewhere. Password login remains available until the client key has been
+  # copied over.
   services.openssh = {
     enable = true;
     openFirewall = false;
@@ -111,6 +112,8 @@
     "virbr0"
     "tailscale0"
   ];
+  # SSH from the home LAN (wired). Port 22 only, and only on this interface.
+  networking.firewall.interfaces.enp12s0.allowedTCPPorts = [ 22 ];
 
   time.timeZone = "Europe/Athens";
   i18n.defaultLocale = "en_US.UTF-8";

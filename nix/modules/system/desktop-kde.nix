@@ -10,6 +10,16 @@
   };
 
   services.displayManager.sddm.enable = true;
+
+  # SDDM's greeter runs on KWin, which reads the monitor layout from the sddm
+  # user's kwinoutputconfig.json. Without one, every screen comes up unrotated
+  # at a guessed position. This copy mirrors niri's display.kdl, with DP-1 as
+  # the primary so the login box lands there. KWin may replace the symlink
+  # with its own copy; tmpfiles restores it on every boot.
+  systemd.tmpfiles.rules = [
+    "d /var/lib/sddm/.config 0755 sddm sddm -"
+    "L+ /var/lib/sddm/.config/kwinoutputconfig.json - - - - ${./sddm-kwinoutputconfig.json}"
+  ];
   services.desktopManager.plasma6.enable = true;
 
   # KDE's portal is needed by sandboxed/desktop apps for file pickers, screen
