@@ -92,8 +92,8 @@ in
         pushd ${flakeDir} > /dev/null && ${rebuild} && popd > /dev/null
       }
 
-      # Update the AI agent CLIs (claude-code/codex/opencode/gemini-cli all
-      # ride the llm-agents input) and rebuild.
+      # Update the AI agent CLIs and apps (claude-code/codex/opencode/
+      # gemini-cli/grok-bot all ride the llm-agents input) and rebuild.
       uai() {
         local original_dir="$PWD"
         cd ${flakeDir} || return 1

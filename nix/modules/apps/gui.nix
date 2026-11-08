@@ -35,6 +35,38 @@ let
     name = "discord-desktop-${discordWithVulkan.version}";
     paths = [ discordLauncher discordWithVulkan ];
   };
+
+  # Discord plays H.264 videos through Cisco's OpenH264, loaded from the path
+  # the host app hardcodes: 2.5.1 (still the case in 1.0.166). Discord's web
+  # client now downloads 2.7.0 for calls and deletes every other version on
+  # start, so videos fail with "no supported source". This read-only store
+  # directory keeps both versions; Discord's cleanup and downloads then fail
+  # harmlessly. If the web client moves past 2.7.0, add that version here too.
+  discordOpenH264 =
+    let
+      cisco =
+        name: hash:
+        pkgs.fetchurl {
+          url = "https://ciscobinary.openh264.org/${name}.bz2";
+          inherit hash;
+        };
+    in
+    pkgs.runCommand "discord-openh264" { nativeBuildInputs = [ pkgs.bzip2 ]; } ''
+      mkdir $out
+      bunzip2 -c ${cisco "libopenh264-2.5.1-linux64.7.so" "sha256-guQ224YGQz4/gjx//zJpxDs7o/ElEKhR73sVa4CtGxE="} \
+        > $out/libopenh264-2.5.1-linux64.7.so
+      bunzip2 -c ${cisco "libopenh264-2.7.0-linux64.8.so" "sha256-RK0N0sWvK6yE0m+J8utOJocIuHOTI9FdM4N/ciHOSYA="} \
+        > $out/libopenh264-2.7.0-linux64.8.so
+    '';
+
+  # Slack's session cookies are encrypted with a key in KWallet. Electron only
+  # picks KWallet when XDG_CURRENT_DESKTOP is KDE; under Hyprland or niri it
+  # falls back to an unprotected store, can't decrypt them, and signs out.
+  slackKwallet = pkgs.slack.overrideAttrs (old: {
+    postFixup = (old.postFixup or "") + ''
+      wrapProgram $out/bin/slack --add-flags --password-store=kwallet6
+    '';
+  });
 in
 
 {
@@ -44,7 +76,7 @@ in
     with pkgs;
     [
       discordDesktop
-      slack
+      slackKwallet
       telegram-desktop
       libreoffice
       pavucontrol
@@ -63,9 +95,10 @@ in
   # Keep the comms launch names used by niri-ctx available immediately.
   home.file = lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
     ".local/bin/discord".source = lib.getExe' discordDesktop "discord";
-    ".local/bin/slack".source = lib.getExe pkgs.slack;
+    ".local/bin/slack".source = lib.getExe slackKwallet;
     ".local/bin/Telegram".source = lib.getExe pkgs.telegram-desktop;
     ".local/bin/telegram-desktop".source = lib.getExe pkgs.telegram-desktop;
+    ".config/discord/discord_asset_cache/openh264".source = discordOpenH264;
   };
 
   # Native-Wayland Electron missizes Discord's maximized surface on the

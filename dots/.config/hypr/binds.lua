@@ -56,6 +56,7 @@ local apps = {
     C = { { "com.mitchellh.ghostty" }, "com.mitchellh.ghostty" },
     D = { { "discord" }, "discord" },
     T = { { "spotify" }, "spotify" },
+    G = { { "grok-bot" }, "grok-bot" },
     O = { { "obsidian" }, "obsidian" },
     P = { { "jetbrains-datagrip" }, "datagrip" },
     M = { { "bruno" }, "bruno" },
@@ -66,8 +67,8 @@ for key, app in pairs(apps) do
     hl.bind(hyper .. " + " .. key, focus_or_launch(app[1], app[2]))
 end
 
--- Hyper+V: open whichever comms app is missing (the comms rule sends it to
--- HDMI-A-1), then jump to that workspace.
+-- Hyper+V: open whichever comms app is missing (rules.lua sends Slack and
+-- Telegram to HDMI-A-1, Discord to DP-2), then jump to the comms workspace.
 local comms = {
     { { "slack" }, "slack" },
     { { "org.telegram.desktop", "telegramdesktop" }, "org.telegram.desktop" },
@@ -82,6 +83,11 @@ hl.bind(hyper .. " + V", function()
     hl.dispatch(hl.dsp.focus({ workspace = "7" }))
 end)
 
+-- Wispr Flow's push-to-talk. Wispr reads the keyboard from evdev and never
+-- grabs it, so without this bind the focused app also gets Shift+Space and
+-- auto-repeats spaces for as long as it is held.
+hl.bind("SHIFT + Space", function() end)
+
 -- Shell (Noctalia).
 hl.bind(mod .. " + Space", hl.dsp.exec_cmd(noctalia .. "panel-toggle launcher"))
 hl.bind(mod .. " + V", hl.dsp.exec_cmd(noctalia .. "panel-toggle clipboard"))
@@ -89,8 +95,12 @@ hl.bind(mod .. " + S", hl.dsp.exec_cmd(noctalia .. "panel-toggle control-center"
 hl.bind(mod .. " + comma", hl.dsp.exec_cmd(noctalia .. "settings-toggle"))
 hl.bind(mod .. " + ALT + L", hl.dsp.exec_cmd(noctalia .. "session lock"))
 hl.bind(mod .. " + SHIFT + Q", hl.dsp.exec_cmd(noctalia .. "panel-toggle session"))
-hl.bind(mod .. " + SHIFT + S", hl.dsp.exec_cmd(noctalia .. "screenshot-region"))
-hl.bind("Print", hl.dsp.exec_cmd(noctalia .. "screenshot-fullscreen pick"))
+-- Screenshots go through grimblast: Noctalia's ignore Hyprland's monitor
+-- rotation and capture the portrait screens sideways (noctalia #4787).
+-- Region to clipboard as on Plasma; Print also saves the focused screen to
+-- ~/Pictures. No --freeze: its hyprpicker overlay also ignores rotation.
+hl.bind(mod .. " + SHIFT + S", hl.dsp.exec_cmd("grimblast copy area"))
+hl.bind("Print", hl.dsp.exec_cmd("grimblast --notify copysave output"))
 hl.bind("ALT + Tab", hl.dsp.exec_cmd(noctalia .. "window-switcher hold"))
 
 hl.bind(mod .. " + Return", hl.dsp.exec_cmd("uwsm app -- com.mitchellh.ghostty.desktop"))

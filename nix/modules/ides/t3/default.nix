@@ -52,7 +52,10 @@ lib.mkIf pkgs.stdenv.hostPlatform.isLinux (
         # Fork builds point at a private feed the app can't read; updates come
         # from t3-code-fork-update instead.
         export T3CODE_DISABLE_AUTO_UPDATE=1
-        exec ${lib.getExe osConfig.programs.appimage.package} "$app" "$@"
+        # Its secrets live in KWallet, which T3 only picks on its own when
+        # XDG_CURRENT_DESKTOP is KDE; elsewhere (Hyprland, niri) it switches to
+        # gnome-libsecret, can't decrypt them, and finds no environments.
+        exec ${lib.getExe osConfig.programs.appimage.package} "$app" --password-store=kwallet6 "$@"
       '';
     };
 

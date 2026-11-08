@@ -1,15 +1,18 @@
 -- Hyprland entry point. Lua-only since 0.57; the stubs for LuaLS live in
 -- /run/current-system/sw/share/hypr/stubs (see .luarc.json).
 --
--- Model: DP-1 and DP-2 run monocle, so every window fills the screen and
--- shortcuts switch between them. HDMI-A-1 (portrait) is the one tiled screen
--- and hosts the comms apps. Noctalia provides the bar, launcher,
--- notifications, lock, idle, polkit agent, and screenshots.
+-- Model: DP-1 runs monocle, so every window fills the screen and shortcuts
+-- switch between them. HDMI-A-1 (portrait) tiles Slack, Telegram and
+-- Spotify in rows; DP-2 (1080p) tiles Discord (65%) and Grok Bot side by
+-- side.
+-- Noctalia provides the bar, launcher, notifications, lock, idle, polkit
+-- agent, and screenshots.
 
 require("monitors")
 require("workspaces")
 require("rules")
 require("binds")
+require("animations")
 
 -- Session environment lives in ~/.config/uwsm/env-hyprland (des/hyprland.nix):
 -- hl.env only reaches Hyprland's own children, not the systemd units UWSM
@@ -20,9 +23,11 @@ hl.config({
         layout = "monocle",
         gaps_in = 4,
         gaps_out = 0,
-        border_size = 2,
+        -- Monocle windows fill the screen edge to edge; only the tiled
+        -- workspaces draw borders (workspaces.lua).
+        border_size = 0,
         col = {
-            active_border = "rgba(7aa2f7ee)",
+            active_border = "rgba(7e9cd8ff)",
             inactive_border = "rgba(00000000)",
         },
     },
@@ -38,10 +43,6 @@ hl.config({
         },
     },
 
-    dwindle = {
-        preserve_split = true,
-    },
-
     input = {
         kb_layout = "us",
         repeat_delay = 275,
@@ -50,6 +51,20 @@ hl.config({
         follow_mouse = 1,
         natural_scroll = true,
         touchpad = { natural_scroll = true },
+    },
+
+    render = {
+        -- Fullscreen video in Helium asks for HDR, and the default (1) then
+        -- modesets DP-1 into HDR at 8-bit: a slow switch plus a "wide color
+        -- gamut ... not in 10-bit mode" warning. The monitors stay SDR.
+        cm_auto_hdr = 0,
+    },
+
+    xwayland = {
+        -- Otherwise X11 apps (Discord) render at scale 1 and get stretched
+        -- with nearest-neighbour, so they look pixelated. Discord sets its
+        -- own scale (apps/gui.nix).
+        force_zero_scaling = true,
     },
 
     binds = {

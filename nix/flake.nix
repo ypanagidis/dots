@@ -7,6 +7,11 @@
     # cycle behind.
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
+    # Ghostty 1.4.0 merged into master on 2026-10-27, but nixos-unstable has
+    # been stuck since earlier that day. Ghostty alone comes from here (see
+    # the overlay below). Drop both once nixos-unstable ships 1.4.
+    nixpkgs-master.url = "github:NixOS/nixpkgs/master";
+
     home-manager = {
       url = "github:nix-community/home-manager";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -42,6 +47,11 @@
     # since it builds with a rust-overlay toolchain.
     herdr.url = "github:herdrdev/herdr";
 
+    # Hyprland and its portal, pinned to a release tag. Deliberately NOT
+    # following our nixpkgs: hyprland.cachix.org is built against the
+    # flake's own pin, and overriding it turns every bump into a local build.
+    hyprland.url = "github:hyprwm/Hyprland/v0.57.0";
+
     plasma-manager = {
       url = "github:nix-community/plasma-manager";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -75,7 +85,12 @@
         specialArgs = { inherit inputs; };
         modules = [
           {
-            nixpkgs.overlays = [ custom-packages.overlays.default ];
+            nixpkgs.overlays = [
+              custom-packages.overlays.default
+              (final: prev: {
+                inherit (inputs.nixpkgs-master.legacyPackages.${prev.stdenv.hostPlatform.system}) ghostty;
+              })
+            ];
           }
           inputs.disko.nixosModules.disko
           ./disk-config.nix
@@ -98,6 +113,12 @@
       nixosConfigurations.executor = nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
         modules = [ ./hosts/executor ];
+      };
+
+      # Home Assistant LXC on the home Proxmox; see hosts/home-assistant/default.nix.
+      nixosConfigurations.home-assistant = nixpkgs.lib.nixosSystem {
+        system = "x86_64-linux";
+        modules = [ ./hosts/home-assistant ];
       };
     };
 }
