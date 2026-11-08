@@ -97,6 +97,16 @@ REST integration: the REST API does not provide the remote MCP server's full
   `vercel-labs/agent-skills` because the `skills.sh` installer is not used on
   Nix. Activate when writing, reviewing, or refactoring React or Next.js code.
   Refresh by re-copying `skills/react-best-practices` from upstream.
+- **brag-slim** — turns a project or website URL into a ~20s launch video
+  with music and share copy, built by the model with local tools. Copied by
+  hand from `latent-spaces/brag`. The full `/brag` is not installed: it
+  bundles 17 MB of audio, depends on Hyperframes, and already hands off to
+  `brag-slim` on Opus 5.5. Refresh by re-copying `skills/brag-slim`.
+- **frontend-design** — aesthetic direction, typography, and layout choices
+  that avoid templated defaults when building or reshaping UI. Copied by hand
+  from the `frontend-design` plugin in `anthropics/claude-plugins-official`
+  (v1.1.1) so Pi and Codex get it too, not just Claude Code. Refresh by
+  re-copying `plugins/frontend-design/skills/frontend-design`.
 
 `grilling` is also installed as the model-invoked primitive used by
 `grill-with-docs`; it is infrastructure rather than a separate everyday

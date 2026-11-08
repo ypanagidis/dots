@@ -1,84 +1,84 @@
-# "dots" btop theme — generated from the ghostty palette in
-# dots/.config/ghostty/config so the terminal tools share one look.
-#   bg #1b1b1d  fg #d7d7d7  red #ff5c57  green #5af078  yellow #ffd866
-#   blue/cyan #45c8ff  magenta #ff40ff  bright-black #5f6368  sel #3f3f44
+# "dots" btop theme: the Kanagawa Wave palette shared with the terminals
+# (dots/.config/ghostty/themes/t3-kanagawa) and T3 Code.
+#   bg #1f1f28  fg #dcd7ba  border #363646  selection #223249
+#   red #e46876  green #98bb6c  yellow #e6c384  blue #7e9cd8  violet #957fb8
 
 # Main background and foreground
-theme[main_bg]="#1b1b1d"
-theme[main_fg]="#d7d7d7"
+theme[main_bg]="#1f1f28"
+theme[main_fg]="#dcd7ba"
 
 # Title color for boxes
-theme[title]="#ffffff"
+theme[title]="#dcd7ba"
 
 # Highlight color for keyboard shortcuts
-theme[hi_fg]="#45c8ff"
+theme[hi_fg]="#7e9cd8"
 
 # Background and foreground of selected item in processes box
-theme[selected_bg]="#3f3f44"
-theme[selected_fg]="#5ad4ff"
+theme[selected_bg]="#223249"
+theme[selected_fg]="#dcd7ba"
 
 # Color of inactive/disabled text
-theme[inactive_fg]="#5f6368"
+theme[inactive_fg]="#727169"
 
 # Color of text appearing on top of graphs
-theme[graph_text]="#d7d7d7"
+theme[graph_text]="#c8c093"
 
 # Background color of the percentage meters
-theme[meter_bg]="#3f3f44"
+theme[meter_bg]="#363646"
 
 # Misc colors for processes box (tree branches etc.)
-theme[proc_misc]="#5af078"
+theme[proc_misc]="#7e9cd8"
 
 # Box outline colors
-theme[cpu_box]="#3f3f44"
-theme[mem_box]="#3f3f44"
-theme[net_box]="#3f3f44"
-theme[proc_box]="#3f3f44"
+theme[cpu_box]="#363646"
+theme[mem_box]="#363646"
+theme[net_box]="#363646"
+theme[proc_box]="#363646"
 
 # Divider line color
-theme[div_line]="#3f3f44"
+theme[div_line]="#363646"
 
 # Temperature graph gradient (cool -> hot)
-theme[temp_start]="#5af078"
-theme[temp_mid]="#ffd866"
-theme[temp_end]="#ff5c57"
+theme[temp_start]="#98bb6c"
+theme[temp_mid]="#e6c384"
+theme[temp_end]="#e46876"
 
 # CPU graph gradient (idle -> busy)
-theme[cpu_start]="#5af078"
-theme[cpu_mid]="#ffd866"
-theme[cpu_end]="#ff5c57"
+theme[cpu_start]="#98bb6c"
+theme[cpu_mid]="#e6c384"
+theme[cpu_end]="#e46876"
 
 # Mem/Disk free meter
-theme[free_start]="#5af078"
-theme[free_mid]="#69ff8a"
-theme[free_end]="#d7d7d7"
+theme[free_start]="#76946a"
+theme[free_mid]="#98bb6c"
+theme[free_end]="#c8c093"
 
 # Mem/Disk cached meter
-theme[cached_start]="#45c8ff"
-theme[cached_mid]="#5ad4ff"
-theme[cached_end]="#ffffff"
+theme[cached_start]="#6a9589"
+theme[cached_mid]="#7fb4ca"
+theme[cached_end]="#dcd7ba"
 
 # Mem/Disk available meter
-theme[available_start]="#ffd866"
-theme[available_mid]="#ffe680"
-theme[available_end]="#ffffff"
+theme[available_start]="#c0a36e"
+theme[available_mid]="#e6c384"
+theme[available_end]="#dcd7ba"
 
 # Mem/Disk used meter
-theme[used_start]="#ff5c57"
-theme[used_mid]="#ff6b66"
-theme[used_end]="#ffffff"
+theme[used_start]="#c34043"
+theme[used_mid]="#e46876"
+theme[used_end]="#dcd7ba"
 
 # Download graph gradient
-theme[download_start]="#45c8ff"
-theme[download_mid]="#5ad4ff"
-theme[download_end]="#ff40ff"
+theme[download_start]="#7e9cd8"
+theme[download_mid]="#7fb4ca"
+theme[download_end]="#957fb8"
 
 # Upload graph gradient
-theme[upload_start]="#ff40ff"
-theme[upload_mid]="#ff66ff"
-theme[upload_end]="#ffffff"
+theme[upload_start]="#957fb8"
+theme[upload_mid]="#938aa9"
+theme[upload_end]="#dcd7ba"
 
 # Process box gradient (color by cpu usage)
-theme[process_start]="#45c8ff"
-theme[process_mid]="#bd5eff"
-theme[process_end]="#ff5c57"
+theme[process_start]="#7e9cd8"
+theme[process_mid]="#957fb8"
+theme[process_end]="#e46876"

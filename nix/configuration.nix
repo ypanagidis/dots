@@ -12,6 +12,7 @@
     ./modules/system/base-packages.nix
     ./modules/system/desktop-kde.nix
     ./modules/system/desktop-niri.nix
+    ./modules/system/desktop-hyprland.nix
     ./modules/system/1password.nix
     ./modules/system/virtualisation.nix
     ./modules/system/gpu.nix

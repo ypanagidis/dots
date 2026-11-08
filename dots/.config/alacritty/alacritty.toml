@@ -35,37 +35,38 @@ glyph_offset = { x = 0, y = 6 }
 draw_bold_text_with_bright_colors = false
 transparent_background_colors = true
 
+# Same palette as Ghostty (ghostty/themes/t3-kanagawa).
 [colors.primary]
-background = "#1b1b1d"
-foreground = "#d7d7d7"
+background = "#1f1f28"
+foreground = "#dcd7ba"
 
 [colors.cursor]
-text = "#1b1b1d"
-cursor = "#d7d7d7"
+text = "#1f1f28"
+cursor = "#dcd7ba"
 
 [colors.selection]
-text = "#ffffff"
-background = "#3f3f44"
+text = "#dcd7ba"
+background = "#223249"
 
 [colors.normal]
-black = "#1b1b1d"
-red = "#ff5c57"
-green = "#5af078"
-yellow = "#ffd866"
-blue = "#45c8ff"
-magenta = "#ff40ff"
-cyan = "#45c8ff"
-white = "#d7d7d7"
+black = "#16161d"
+red = "#c34043"
+green = "#76946a"
+yellow = "#c0a36e"
+blue = "#7e9cd8"
+magenta = "#957fb8"
+cyan = "#6a9589"
+white = "#c8c093"
 
 [colors.bright]
-black = "#5f6368"
-red = "#ff6b66"
-green = "#69ff8a"
-yellow = "#ffe680"
-blue = "#5ad4ff"
-magenta = "#ff66ff"
-cyan = "#5ad4ff"
-white = "#ffffff"
+black = "#727169"
+red = "#e82424"
+green = "#98bb6c"
+yellow = "#e6c384"
+blue = "#7fb4ca"
+magenta = "#938aa9"
+cyan = "#7aa89f"
+white = "#dcd7ba"
 
 [selection]
 semantic_escape_chars = ",│`|:\"' ()[]{}<>\t"

@@ -1,10 +1,13 @@
 { ... }:
 
 {
-  # Plasma remains the default desktop. Niri is an independent login session;
-  # its shell and workflow helpers only start after selecting Niri in SDDM.
+  # Plasma remains the default desktop. Niri and Hyprland are independent
+  # login sessions sharing the Noctalia shell; it and the workflow helpers
+  # only start after selecting one of them in SDDM.
   imports = [
     ./kde.nix
+    ./noctalia.nix
     ./niri.nix
+    ./hyprland.nix
   ];
 }

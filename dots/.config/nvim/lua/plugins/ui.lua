@@ -1,4 +1,4 @@
-vim.cmd("colorscheme mono-charcoal")
+vim.cmd("colorscheme t3-kanagawa")
 local palette = require("config.theme").palette
 
 -- Lualine

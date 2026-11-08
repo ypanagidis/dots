@@ -24,12 +24,12 @@
           system = prev.stdenv.hostPlatform.system;
 
           # Release tags are v<port>+wispr<app>; bump with update-wispr-flow.sh.
-          wisprAppVersion = "1.6.957";
-          wisprPortVersion = "1.0.4";
+          wisprAppVersion = "1.6.1337";
+          wisprPortVersion = "1.0.5";
           wisprFlowVersion = "${wisprAppVersion}-${wisprPortVersion}";
           wisprFlowSrc = final.fetchurl {
             url = "https://github.com/wispr-flow-linux/wispr-flow-linux/releases/download/v${wisprPortVersion}%2Bwispr${wisprAppVersion}/wispr-flow-${wisprFlowVersion}-x86_64.AppImage";
-            hash = "sha256-2jeeMDWVnkadE5lyjwb1ThKplYoxp5P/GgZ39OEtiMU=";
+            hash = "sha256-FJtxBgDtKdZSboiwm15tGBU5wXhBxykHp7qYJ1P9YyY=";
           };
           wisprFlowContents = final.appimageTools.extract {
             pname = "wispr-flow";

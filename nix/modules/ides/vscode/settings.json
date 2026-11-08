@@ -9,7 +9,7 @@
   "editor.minimap.enabled": false,
   "editor.stickyScroll.enabled": true,
   "editor.suggest.insertMode": "replace",
-  "extensions.autoUpdate": "onlyEnabledExtensions",
+  "extensions.autoUpdate": "on",
   "sortJSON.orderOverride": ["name", "version", "description"],
   "sortJSON.orderUnderride": ["dependencies", "devDependencies"],
   "typescript.preferences.importModuleSpecifier": "project-relative",
@@ -21,35 +21,35 @@
   "vim.insertModeKeyBindingsNonRecursive": [
     {
       "after": ["<esc>"],
-      "before": ["j", "k"]
+      "before": ["j", "k"],
     },
-    { "before": ["<ctrl, k"], "after": ["<ctrl, p>"] }
+    { "before": ["<ctrl, k"], "after": ["<ctrl, p>"] },
   ],
   "vim.leader": "<space>",
   "vim.normalModeKeyBindingsNonRecursive": [
     {
       "before": ["<leader>", "f", "f"],
-      "commands": ["workbench.action.quickOpen"]
+      "commands": ["workbench.action.quickOpen"],
     },
     {
       "before": ["<leader>", "g", "i"],
-      "commands": ["editor.action.referenceSearch.trigger"]
+      "commands": ["editor.action.referenceSearch.trigger"],
     },
     {
       "before": ["<leader>", "f", "F"],
-      "commands": ["workbench.action.quickOpen"]
+      "commands": ["workbench.action.quickOpen"],
     },
     {
       "before": ["g", "d"],
-      "commands": ["editor.action.revealDefinition", "cancelSelection"]
+      "commands": ["editor.action.revealDefinition", "cancelSelection"],
     },
     {
       "before": ["g", "r"],
-      "commands": ["editor.action.revealImp", "cancelSelection"]
+      "commands": ["editor.action.revealImp", "cancelSelection"],
     },
     {
       "before": ["<leader>", "s"],
-      "commands": ["workbench.action.files.save"]
+      "commands": ["workbench.action.files.save"],
     },
     // {
     //   "before": ["<leader>", "q"],
@@ -57,39 +57,39 @@
     // },
     {
       "before": ["]", "d"],
-      "commands": ["editor.action.marker.next"]
+      "commands": ["editor.action.marker.next"],
     },
     {
       "before": ["<leader>", "c", "a"],
-      "commands": ["editor.action.quickFix"]
+      "commands": ["editor.action.quickFix"],
     },
     {
       "before": ["<leader>", "n", "h"],
-      "commands": [":nohl"]
+      "commands": [":nohl"],
     },
     {
       "before": ["<C-d>"],
-      "after": ["<C-d>", "z", "z"]
+      "after": ["<C-d>", "z", "z"],
     },
     {
       "before": ["<C-u>"],
-      "after": ["<C-u>", "z", "z"]
+      "after": ["<C-u>", "z", "z"],
     },
     {
       "before": ["<leader>", "f"],
-      "commands": ["workbench.action.quickOpen"]
+      "commands": ["workbench.action.quickOpen"],
     },
     {
       "before": ["<leader>", "w", "v"],
-      "commands": ["workbench.action.splitEditor"]
+      "commands": ["workbench.action.splitEditor"],
     },
     {
       "before": ["<leader>", "w", "-"],
-      "commands": ["workbench.action.splitEditorDown"]
+      "commands": ["workbench.action.splitEditorDown"],
     },
     {
       "before": ["<leader>", "w", "d"],
-      "commands": ["workbench.action.closeEditorsInGroup"]
+      "commands": ["workbench.action.closeEditorsInGroup"],
     },
     // {
     // 	"before": ["<C-i>"],
@@ -97,16 +97,16 @@
     // },
     {
       "before": ["<leader>", "b", "d"],
-      "commands": ["workbench.action.closeActiveEditor"]
+      "commands": ["workbench.action.closeActiveEditor"],
     },
     {
       "before": ["<leader>", "b", "o"],
-      "commands": ["workbench.action.closeOtherEditors"]
+      "commands": ["workbench.action.closeOtherEditors"],
     },
     {
       "before": ["<leader>", "s", "x"],
-      "commands": ["workbench.action.joinTwoGroups"]
-    }
+      "commands": ["workbench.action.joinTwoGroups"],
+    },
   ],
   "vim.visualModeKeyBindingsNonRecursive": [
     // gs a '  -> surround selection with single quotes
@@ -124,7 +124,7 @@
     // gs a }  -> surround selection with {...}
     { "before": ["g", "s", "a", "}"], "after": ["S", "}"] },
     // gs a }  -> surround selection with {...}
-    { "before": ["g", "s", "a", "<"], "after": ["S", "<"] }
+    { "before": ["g", "s", "a", "<"], "after": ["S", "<"] },
   ],
   "vim.useSystemClipboard": true,
   "workbench.settings.editor": "json",
@@ -154,17 +154,17 @@
   "vim.visualModeKeyBindings": [
     {
       "before": [">"],
-      "commands": ["editor.action.indentLines"]
+      "commands": ["editor.action.indentLines"],
     },
     {
       "before": ["<"],
-      "commands": ["editor.action.outdentLines"]
-    }
+      "commands": ["editor.action.outdentLines"],
+    },
   ],
   "vim.surround": true,
   "redhat.telemetry.enabled": false,
   "[jsonc]": {
-    "editor.defaultFormatter": "esbenp.prettier-vscode"
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
   },
   "json.schemaDownload.enable": true,
   "typescript.tsserver.maxTsServerMemory": 8192,
@@ -184,20 +184,20 @@
     "editor.quickSuggestions": {
       "other": true,
       "comments": false,
-      "strings": true
+      "strings": true,
     },
-    "editor.defaultFormatter": "redhat.vscode-yaml"
+    "editor.defaultFormatter": "redhat.vscode-yaml",
   },
   "[github-actions-workflow]": {
-    "editor.defaultFormatter": "redhat.vscode-yaml"
+    "editor.defaultFormatter": "redhat.vscode-yaml",
   },
   "editor.accessibilitySupport": "off",
   "remote.SSH.remotePlatform": {
     "yiannis@get-movies.mine": "linux",
-    "yiannis@192.168.1.135": "linux"
+    "yiannis@192.168.1.135": "linux",
   },
   "[astro]": {
-    "editor.defaultFormatter": "esbenp.prettier-vscode"
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
   },
   "editor.wordBasedSuggestions": "off",
   "biome.lsp.bin": "./node_modules/.bin/biome",
@@ -209,5 +209,5 @@
   "window.openFilesInNewWindow": "off",
   "window.openWithoutArgumentsInNewWindow": "off",
   "security.promptForRemoteFileProtocolHandling": false,
-  "workbench.iconTheme": "ayu"
+  "workbench.iconTheme": "ayu",
 }

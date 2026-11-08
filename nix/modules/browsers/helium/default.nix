@@ -11,7 +11,12 @@
   config = lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
     programs.helium = {
       enable = true;
-      flags = [ ];
+      # Cookies and saved passwords are encrypted with a KWallet key. Chromium
+      # only picks KWallet when XDG_CURRENT_DESKTOP is KDE; under Hyprland or
+      # niri it falls back to an unprotected store and can't read them.
+      flags = [
+        "--password-store=kwallet6"
+      ];
       # The flake's wrapper always adds an ozone hint behind a shell
       # expansion, but wrapGAppsHook turns it into a binary wrapper, so
       # Chromium receives the unexpanded `${NIXOS_OZONE_WL:+...}` string as an

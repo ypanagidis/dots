@@ -57,6 +57,7 @@ in
     llmAgents.chatgpt
     llmAgents.opencode
     llmAgents.gemini-cli
+    llmAgents.grok-bot
     llmAgents.orca
     plannotator
   ];
