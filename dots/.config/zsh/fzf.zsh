@@ -15,6 +15,7 @@ export FZF_DEFAULT_OPTS='
   --prompt="  "
   --pointer="  "
   --preview-window=right:65%:wrap:border-left
+  --color=bg+:#2a2a37,gutter:-1,border:#363646,hl:#e6c384,hl+:#e6c384,pointer:#7e9cd8,prompt:#7e9cd8,info:#727169,marker:#98bb6c
 '
 
 export _FZF_PREVIEW_CMD='bat --color=always --style=plain,numbers --line-range=:500 {}'

@@ -1,0 +1,27 @@
+# The Kanagawa Wave theme used in T3 Code: one flat #1F1F28 background,
+# warm #DCD7BA text and the #223249 selection. The 16 colours are the
+# terminal palette of the VS Code theme T3 imported it from
+# (metaphore.kanagawa-vscode-color-theme). The other apps' themes use the
+# same values.
+background = #1f1f28
+foreground = #dcd7ba
+cursor-color = #dcd7ba
+cursor-text = #1f1f28
+selection-background = #223249
+selection-foreground = #dcd7ba
+palette = 0=#16161d
+palette = 1=#c34043
+palette = 2=#76946a
+palette = 3=#c0a36e
+palette = 4=#7e9cd8
+palette = 5=#957fb8
+palette = 6=#6a9589
+palette = 7=#c8c093
+palette = 8=#727169
+palette = 9=#e82424
+palette = 10=#98bb6c
+palette = 11=#e6c384
+palette = 12=#7fb4ca
+palette = 13=#938aa9
+palette = 14=#7aa89f
+palette = 15=#dcd7ba

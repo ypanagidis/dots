@@ -205,12 +205,16 @@ let
   };
 in
 {
+  xdg.dataFile."color-schemes/T3Kanagawa.colors".source = ./T3Kanagawa.colors;
+
   programs.plasma = {
     enable = true;
     overrideConfig = true;
     workspace = {
       lookAndFeel = "org.kde.breezedark.desktop";
-      colorScheme = "BreezeDark";
+      # Breeze Dark recoloured to the T3 Code theme (T3Kanagawa.colors). Qt
+      # apps under Hyprland read it too, through QT_QPA_PLATFORMTHEME=kde.
+      colorScheme = "T3Kanagawa";
       theme = "breeze-dark";
     };
     # Never suspend on idle; the screens still dim and turn off. The display

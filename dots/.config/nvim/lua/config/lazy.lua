@@ -248,7 +248,7 @@ require("lazy").setup({
 		},
 	},
 	install = {
-		colorscheme = { "mono-charcoal", "default" },
+		colorscheme = { "t3-kanagawa", "default" },
 	},
 	checker = {
 		enabled = true,
