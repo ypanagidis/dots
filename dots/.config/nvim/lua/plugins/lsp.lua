@@ -2,36 +2,61 @@
 
 local ts_root_markers = { "tsconfig.json", "jsconfig.json", "package.json", ".git" }
 
+-- One server per monorepo, not one per package: prefer the workspace root.
+local ts_workspace_markers = { "pnpm-workspace.yaml" }
+
 local function get_ts_root(bufnr)
 	local filename = vim.api.nvim_buf_get_name(bufnr)
-	return vim.fs.root(filename, ts_root_markers)
+	return vim.fs.root(filename, ts_workspace_markers) or vim.fs.root(filename, ts_root_markers)
 end
 
-local function local_tsgo(root)
+local function ts_major(root)
+	local ok, lines = pcall(vim.fn.readfile, root .. "/node_modules/typescript/package.json")
+	if not ok then
+		return nil
+	end
+	local decoded, pkg = pcall(vim.json.decode, table.concat(lines, "\n"))
+	if not decoded or type(pkg) ~= "table" or type(pkg.version) ~= "string" then
+		return nil
+	end
+	return tonumber(pkg.version:match("^(%d+)"))
+end
+
+-- The project's own TypeScript 7 language server: the preview package's
+-- `tsgo`, or stable TypeScript 7+, which ships the native server as `tsc`.
+local function local_native_ts(root)
 	if not root then
 		return nil
 	end
-	local bin = root .. "/node_modules/.bin/tsgo"
-	return vim.fn.executable(bin) == 1 and bin or nil
+	local tsgo = root .. "/node_modules/.bin/tsgo"
+	if vim.fn.executable(tsgo) == 1 then
+		return tsgo
+	end
+	local tsc = root .. "/node_modules/.bin/tsc"
+	local major = ts_major(root)
+	if major and major >= 7 and vim.fn.executable(tsc) == 1 then
+		return tsc
+	end
+	return nil
 end
 
-local function has_local_tsgo(root)
-	return local_tsgo(root) ~= nil
+local function has_local_native_ts(root)
+	return local_native_ts(root) ~= nil
 end
 
--- tsgo (TypeScript 7 native LSP). nvim-lspconfig ships this as `tsc` (the old
--- `tsgo` name is deprecated). Its default cmd prefers a binary called `tsc`,
--- which in most projects is TypeScript 5's tsc and rejects `--lsp`, so the
--- server exits immediately. Always launch tsgo: the project-local one when
--- present, otherwise the one on PATH.
+-- TypeScript 7 native LSP. nvim-lspconfig ships this as `tsc` (the old `tsgo`
+-- name is deprecated). Its default cmd prefers a binary called `tsc`, which in
+-- a TypeScript 5/6 project rejects `--lsp`, so the server exits immediately.
+-- Launch the project's own TypeScript 7 when it has one; projects on 5/6 get
+-- ts_ls with their own tsserver instead.
 vim.lsp.config("tsc", {
 	cmd = function(dispatchers, config)
-		local bin = local_tsgo(config and config.root_dir) or "tsgo"
+		local bin = local_native_ts(config and config.root_dir) or "tsgo"
 		return vim.lsp.rpc.start({ bin, "--lsp", "--stdio" }, dispatchers)
 	end,
 	root_dir = function(bufnr, on_dir)
 		local root = get_ts_root(bufnr)
-		if has_local_tsgo(root) then
+		if has_local_native_ts(root) then
 			on_dir(root)
 		end
 	end,
@@ -58,7 +83,7 @@ vim.lsp.config("tsc", {
 vim.lsp.config("ts_ls", {
 	root_dir = function(bufnr, on_dir)
 		local root = get_ts_root(bufnr)
-		if root and not has_local_tsgo(root) then
+		if root and not has_local_native_ts(root) then
 			on_dir(root)
 		end
 	end,
