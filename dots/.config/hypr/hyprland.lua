@@ -58,6 +58,9 @@ hl.config({
         -- modesets DP-1 into HDR at 8-bit: a slow switch plus a "wide color
         -- gamut ... not in 10-bit mode" warning. The monitors stay SDR.
         cm_auto_hdr = 0,
+        -- cm_sdr_eotf stays at its default (sRGB): with DP-1's output TF also
+        -- at default, apps reach the calibrated panel unconverted. Don't set
+        -- it to gamma22/gamma22force; that changes every monitor's shadows.
     },
 
     xwayland = {

@@ -25,6 +25,17 @@ hl.window_rule({
     suppress_event = "maximize",
 })
 
+-- ArgyllCMS test-patch window (dispcal/dispread/dispwin, classless X11
+-- "TestWin"). `-d1` only picks DP-1's coordinates; Hyprland still opens new
+-- X11 windows on the focused monitor, so pin it to the screen being measured.
+hl.window_rule({
+    name = "argyll-testwin",
+    match = { class = "^$", title = "^TestWin$", xwayland = true },
+    monitor = "DP-1",
+    center = true,
+    no_initial_focus = true,
+})
+
 -- Upstream default: invisible XWayland drag helpers must not take focus.
 hl.window_rule({
     name = "fix-xwayland-drags",

@@ -8,10 +8,27 @@ hl.monitor({
     mode = "5120x2880@180.003",
     position = "0x1080",
     scale = 2,
-    -- ASUS OSD: DCI-P3 gamut, 6500K; gamma 2.0 visually matches gamma 2.2.
-    cm = "dp3",
-    sdr_eotf = "gamma22",
-    -- P3 at 8-bit bands in gradients.
+    -- Calibrated in the monitor, not in Hyprland (SpyderExpress + ArgyllCMS
+    -- 3.5.0, 2026-11-13; data in ~/.local/share/icc/xg27jcg-study/runs).
+    -- ASUS OSD: Racing, Display Color Space DCI-P3, Gamma 2.0, Contrast 80,
+    -- Color Temp User R94 G93 B91, Brightness 78, VividPixel 50 (neutral:
+    -- 0 blurs), Variable OD 0 (factory 10 overshoots: halos on dark UI),
+    -- Overclocking on (180Hz), everything else factory.
+    -- Measured: white 251 cd/m2 (matches the MacBook Pro), 6475K, tint ~0;
+    -- gamma 2.12 flat; greys neutral; 940:1; avg 1.1 dE as a P3 display.
+    -- OSD labels run dark: "2.2" measures 2.34, "2.0" 2.12, "1.8" 1.93, and
+    -- the "6500K" preset is ~7300K. User gains differ per colour space (the
+    -- sRGB-mode trim R99 G97 B88 gives 5880K in P3 mode).
+    -- Hyprland is a pure pass-through here (cm srgb, sdr_eotf and the global
+    -- cm_sdr_eotf at default), so sRGB content shows with P3 saturation. That
+    -- vivid look is the user's choice; so is the panel's ~2.1 curve over the
+    -- sRGB toe (sdr_eotf = "gamma22" adds it; measured, user preferred
+    -- without). No ICC: Hyprland 0.57's ICC path clamps to sRGB and crushes
+    -- near-black (33^3 LUT indexed in linear light).
+    -- Hyprland bug: sdr_eotf and vrr aren't in CMonitorRule::compare, so changing
+    -- only those and reloading does nothing; flip `cm` too to force a reapply.
+    cm = "srgb",
+    -- Wide gamut at 8-bit bands in gradients.
     bitdepth = 10,
     vrr = 1,
 })
