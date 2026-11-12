@@ -59,7 +59,16 @@
     "uinput"
   ];
 
-  services.udev.packages = [ pkgs.wispr-flow ];
+  services.udev.packages = [
+    pkgs.wispr-flow
+    # Datacolor Spyder 2024 family (SpyderExpress = 085c:0a0b). Flagging it as a
+    # colour-measurement device lets systemd's 70-uaccess give the seat access,
+    # so ArgyllCMS can open it without root. Not pkgs.argyllcms's own rules:
+    # NixOS's udev check rejects them over a commented-out `usb_id` call.
+    (pkgs.writeTextDir "lib/udev/rules.d/55-spyder.rules" ''
+      SUBSYSTEM=="usb", ATTRS{idVendor}=="085c", ATTRS{idProduct}=="0a0b", ENV{COLOR_MEASUREMENT_DEVICE}="1"
+    '')
+  ];
 
   boot.kernelParams = [
     # Prefer ACPI S3 suspend-to-RAM over the shallower s2idle mode.
